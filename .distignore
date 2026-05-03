@@ -1,0 +1,36 @@
+# Files and directories excluded from the wordpress.org plugin zip.
+#
+# The .org plugin directory ships its own update mechanism; the GitHub
+# self-updater would conflict with it (and is plain dangerous on a .org
+# install where users expect WP core to handle updates). Same for repo
+# infrastructure that has no purpose at runtime.
+
+.distignore
+.git
+.github
+.gitignore
+.editorconfig
+
+# CI / repo metadata
+README.md
+CONTRIBUTING.md
+SECURITY.md
+PULL_REQUEST_TEMPLATE.md
+
+# GitHub-only updaters — never ship to .org.
+github-updater.php
+updater.php
+
+# Tooling artefacts that occasionally land in the working tree.
+node_modules
+vendor
+phpunit.xml
+phpunit.xml.dist
+phpcs.xml
+phpcs.xml.dist
+composer.json
+composer.lock
+package.json
+package-lock.json
+tests
+.phpunit.result.cache
