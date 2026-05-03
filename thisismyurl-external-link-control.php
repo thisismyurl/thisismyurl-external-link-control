@@ -20,6 +20,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-host.php';
+
 class TIMU_ELC {
 
     public function __construct() {
@@ -89,15 +91,16 @@ class TIMU_ELC {
         return preg_replace_callback( '/<a\s[^>]*href=["\']([^"\']*)["\'][^>]*>/i', function( $matches ) use ( $options ) {
             $link_html = $matches[0];
             $url       = $matches[1];
-            $site_url  = get_site_url();
 
-            if ( strpos( $url, $site_url ) === false && strpos( $url, 'http' ) === 0 ) {
-                if ( ! empty( $options['new_tab'] ) && false === strpos( $link_html, 'target=' ) ) {
-                    $link_html = str_replace( '<a ', '<a target="_blank" ', $link_html );
-                }
-                if ( ! empty( $options['nofollow'] ) && false === strpos( $link_html, 'rel=' ) ) {
-                    $link_html = str_replace( '<a ', '<a rel="nofollow noopener noreferrer" ', $link_html );
-                }
+            if ( ! TIMU_ELC_Host::is_external( $url ) ) {
+                return $link_html;
+            }
+
+            if ( ! empty( $options['new_tab'] ) && false === strpos( $link_html, 'target=' ) ) {
+                $link_html = str_replace( '<a ', '<a target="_blank" ', $link_html );
+            }
+            if ( ! empty( $options['nofollow'] ) && false === strpos( $link_html, 'rel=' ) ) {
+                $link_html = str_replace( '<a ', '<a rel="nofollow noopener noreferrer" ', $link_html );
             }
             return $link_html;
         }, $content );
