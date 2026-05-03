@@ -185,12 +185,53 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 			}
 
 			$transformed = self::transform_anchors( $prepared, $options, $forced_rel );
+			$transformed = self::inject_a11y_new_tab_notice( $transformed );
 
 			if ( ! empty( $skipped ) ) {
 				$transformed = strtr( $transformed, $skipped );
 			}
 
 			return $transformed;
+		}
+
+		/**
+		 * Append a visually-hidden "(opens in new tab)" notice immediately
+		 * before `</a>` for any anchor where we forced target="_blank".
+		 *
+		 * Anchors are marked during transform_anchors() with a
+		 * data-timu-elc-forced-blank="1" attribute; this method consumes
+		 * the marker (it would otherwise leak into the final HTML).
+		 *
+		 * Filterable via `timu_elc_a11y_new_tab_text` so site owners can
+		 * customise the wording (e.g. translate, shorten, swap to an icon).
+		 * Returning an empty string suppresses injection entirely.
+		 *
+		 * @param string $html Already-transformed HTML.
+		 * @return string
+		 */
+		private static function inject_a11y_new_tab_notice( $html ) {
+			if ( false === strpos( $html, 'data-timu-elc-forced-blank' ) ) {
+				return $html;
+			}
+
+			$notice = (string) apply_filters(
+				'timu_elc_a11y_new_tab_text',
+				/* translators: hidden text appended to external links forced to open in a new tab. */
+				__( '(opens in new tab)', 'thisismyurl-external-link-control' )
+			);
+
+			return preg_replace_callback(
+				'#<a\b([^>]*\bdata-timu-elc-forced-blank=["\']1["\'][^>]*)>(.*?)</a>#is',
+				static function ( $m ) use ( $notice ) {
+					$attrs = preg_replace( '/\s*data-timu-elc-forced-blank=["\']1["\']/i', '', $m[1] );
+					$inner = $m[2];
+					if ( '' !== $notice ) {
+						$inner .= '<span class="screen-reader-text"> ' . esc_html( $notice ) . '</span>';
+					}
+					return '<a' . $attrs . '>' . $inner . '</a>';
+				},
+				$html
+			);
 		}
 
 		/**
@@ -219,15 +260,24 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 					$href_host = TIMU_ELC_Host::host_for_href( $href );
 					$rule      = class_exists( 'TIMU_ELC_Domain_Rules' ) ? TIMU_ELC_Domain_Rules::match( $href_host ) : null;
 
-					$target = $existing_target;
+					$target  = $existing_target;
+					$we_set_blank = false;
 					if ( null === $existing_target || '' === $existing_target ) {
 						if ( $rule && '' !== $rule['target'] ) {
 							$target = $rule['target'];
 							$tags->set_attribute( 'target', $target );
+							$we_set_blank = ( '_blank' === $target );
 						} elseif ( ! empty( $options['new_tab'] ) ) {
 							$target = '_blank';
 							$tags->set_attribute( 'target', '_blank' );
+							$we_set_blank = true;
 						}
+					}
+
+					if ( $we_set_blank ) {
+						// Mark the tag so the post-pass can inject screen-reader text
+						// after </a> for accessibility ("opens in new tab" warning).
+						$tags->set_attribute( 'data-timu-elc-forced-blank', '1' );
 					}
 
 					$rel_to_add = array();
