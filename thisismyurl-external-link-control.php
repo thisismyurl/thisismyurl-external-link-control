@@ -30,8 +30,20 @@ class TIMU_ELC {
         add_action( 'admin_init', array( $this, 'register_plugin_settings' ) );
         add_action( 'admin_menu', array( $this, 'create_tools_page' ) );
         add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'add_plugin_action_links' ) );
-        add_filter( 'the_content', array( $this, 'modify_external_links' ), 99 );
-        add_filter( 'comment_text', array( $this, 'modify_comment_links' ), 99 );
+        $priority = (int) apply_filters( 'timu_elc_priority', 99 );
+
+        add_filter( 'the_content', array( $this, 'modify_external_links' ), $priority );
+        add_filter( 'the_excerpt', array( $this, 'modify_external_links' ), $priority );
+        add_filter( 'widget_text_content', array( $this, 'modify_external_links' ), $priority );
+        add_filter( 'widget_block_content', array( $this, 'modify_external_links' ), $priority );
+        add_filter( 'comment_text', array( $this, 'modify_comment_links' ), $priority );
+
+        // FSE / block themes: render_block applies to every block, including
+        // navigation, query-loop, post-content, and link blocks. We filter
+        // only the block types whose output is HTML containing <a> tags we
+        // would otherwise miss when the_content/the_excerpt are not the
+        // outer template surface.
+        add_filter( 'render_block', array( $this, 'modify_block_links' ), $priority, 2 );
 
         // Set defaults upon activation.
         register_activation_hook( __FILE__, array( $this, 'activate_plugin_defaults' ) );
@@ -132,6 +144,59 @@ class TIMU_ELC {
         }
         $post = get_post();
         return $processor->process( $content, $post instanceof WP_Post ? $post : null );
+    }
+
+    /**
+     * Apply external-link rules to a rendered block on FSE / block themes.
+     *
+     * Filters the rendered HTML for the small set of core blocks whose
+     * <a> output bypasses the_content / the_excerpt:
+     *
+     *   - core/navigation, core/navigation-link, core/navigation-submenu
+     *   - core/post-content (when used inside a synced pattern, query loop, etc.)
+     *   - core/query, core/post-template, core/latest-posts
+     *   - core/social-link (rel=me / sameAs profile links)
+     *   - core/site-logo, core/post-title (link-on-title variants)
+     *
+     * Filterable via `timu_elc_block_types` so a site owner or a
+     * downstream plugin can add or remove block names from the list
+     * without forking this file.
+     */
+    public function modify_block_links( $block_content, $block ) {
+        if ( ! is_string( $block_content ) || '' === $block_content ) {
+            return $block_content;
+        }
+        if ( ! is_array( $block ) || empty( $block['blockName'] ) ) {
+            return $block_content;
+        }
+
+        $eligible = (array) apply_filters(
+            'timu_elc_block_types',
+            array(
+                'core/navigation',
+                'core/navigation-link',
+                'core/navigation-submenu',
+                'core/post-content',
+                'core/query',
+                'core/post-template',
+                'core/latest-posts',
+                'core/social-link',
+                'core/site-logo',
+                'core/post-title',
+            )
+        );
+        if ( ! in_array( $block['blockName'], $eligible, true ) ) {
+            return $block_content;
+        }
+
+        $processor = new TIMU_ELC_Link_Processor();
+        if ( ! $processor->enabled() ) {
+            return $block_content;
+        }
+
+        // Block render output is per-block, not per-post; cache key would
+        // need a block-content-hash dimension. Skip the cache and run direct.
+        return $processor->transform( $block_content );
     }
 
     /**
