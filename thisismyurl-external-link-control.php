@@ -26,9 +26,37 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-link-processor.ph
 
 class TIMU_ELC {
 
+    /**
+     * Singleton instance.
+     *
+     * @var self|null
+     */
+    private static $instance = null;
+
+    /**
+     * Acquire (and lazily create) the singleton instance.
+     *
+     * @return self
+     */
+    public static function instance() {
+        if ( null === self::$instance ) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+
+    /**
+     * Hook screen ID for the tools page, captured from add_management_page()
+     * so admin asset enqueue can scope itself to this screen only.
+     *
+     * @var string
+     */
+    private $admin_hook = '';
+
     public function __construct() {
         add_action( 'admin_init', array( $this, 'register_plugin_settings' ) );
         add_action( 'admin_menu', array( $this, 'create_tools_page' ) );
+        add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
         add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'add_plugin_action_links' ) );
         $priority = (int) apply_filters( 'timu_elc_priority', 99 );
 
@@ -66,10 +94,31 @@ class TIMU_ELC {
 
     public function add_plugin_action_links( $links ) {
         $custom_links = array(
-            '<a href="' . admin_url( 'tools.php?page=thisismyurl-external-link-control' ) . '">' . esc_html__( 'Settings', 'thisismyurl-external-link-control' ) . '</a>',
-            '<a href="https://thisismyurl.com/donate/" target="_blank" style="color: #2271b1; font-weight: bold;">' . esc_html__( 'Donate', 'thisismyurl-external-link-control' ) . '</a>',
+            '<a href="' . esc_url( admin_url( 'tools.php?page=thisismyurl-external-link-control' ) ) . '">' . esc_html__( 'Settings', 'thisismyurl-external-link-control' ) . '</a>',
+            '<a href="https://thisismyurl.com/donate/" target="_blank" rel="noopener noreferrer" class="timu-elc-donate-link">' . esc_html__( 'Donate', 'thisismyurl-external-link-control' ) . '</a>',
         );
         return array_merge( $custom_links, $links );
+    }
+
+    /**
+     * Enqueue the small admin stylesheet on our own settings screen.
+     * Replaces the inline `style=` attributes that 0.6112 sprinkled
+     * through the plugin row link and the settings UI.
+     *
+     * @param string $hook Current admin page hook.
+     * @return void
+     */
+    public function enqueue_admin_assets( $hook ) {
+        // Plugin-row donate-link styling is light enough to apply globally
+        // on plugins.php; the rest of the styles only matter on our screen.
+        if ( 'plugins.php' === $hook || ( '' !== $this->admin_hook && $hook === $this->admin_hook ) ) {
+            wp_enqueue_style(
+                'timu-elc-admin',
+                plugins_url( 'assets/css/admin.css', __FILE__ ),
+                array(),
+                '0.6123'
+            );
+        }
     }
 
     public function register_plugin_settings() {
@@ -128,7 +177,7 @@ class TIMU_ELC {
     }
 
     public function create_tools_page() {
-        add_management_page(
+        $this->admin_hook = (string) add_management_page(
             __( 'External Link Control', 'thisismyurl-external-link-control' ),
             __( 'Link Control', 'thisismyurl-external-link-control' ),
             'manage_options',
@@ -230,11 +279,14 @@ class TIMU_ELC {
         <div class="wrap">
             <h1>
                 <?php esc_html_e( 'External Link Control', 'thisismyurl-external-link-control' ); ?>
-                <span style="font-size: 0.5em; font-weight: normal; vertical-align: middle; margin-left: 10px; color: #646970;">
-                    <?php printf( 
-                        esc_html__( 'by %s', 'thisismyurl-external-link-control' ), 
-                        '<a href="https://thisismyurl.com/" target="_blank" style="text-decoration: none; color: inherit;">thisismyurl.com</a>' 
-                    ); ?>
+                <span class="timu-elc-byline">
+                    <?php
+                    printf(
+                        /* translators: %s: brand name "thisismyurl.com" rendered as a link. */
+                        esc_html__( 'by %s', 'thisismyurl-external-link-control' ),
+                        '<a href="https://thisismyurl.com/" target="_blank" rel="noopener noreferrer" class="timu-elc-byline-link">thisismyurl.com</a>'
+                    );
+                    ?>
                 </span>
             </h1>
             
@@ -350,7 +402,7 @@ class TIMU_ELC {
                             <div class="inside">
                                 <p><?php esc_html_e( 'This plugin modifies links dynamically during page render, keeping your database clean.', 'thisismyurl-external-link-control' ); ?></p>
                                 <hr />
-                                <p><a href="https://thisismyurl.com/donate/" class="button button-secondary" target="_blank"><?php esc_html_e( 'Donate to Development', 'thisismyurl-external-link-control' ); ?></a></p>
+                                <p><a href="https://thisismyurl.com/donate/" class="button button-secondary" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Donate to Development', 'thisismyurl-external-link-control' ); ?></a></p>
                             </div>
                         </div>
                     </div>
@@ -361,7 +413,7 @@ class TIMU_ELC {
     }
 }
 
-new TIMU_ELC();
+TIMU_ELC::instance();
 
 /**
  * GitHub Updater Integration.

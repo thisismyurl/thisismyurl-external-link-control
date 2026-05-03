@@ -1,0 +1,38 @@
+/**
+ * External Link Control — admin styles.
+ *
+ * Replaces the inline `style=` attributes used in 0.6112 (plugin row link
+ * styling, settings page byline). Enqueued only on plugins.php and on the
+ * plugin's own settings screen.
+ *
+ * @package TIMU_ELC
+ * @since   0.6123
+ */
+
+.timu-elc-donate-link {
+	color: #2271b1;
+	font-weight: bold;
+}
+
+.timu-elc-byline {
+	font-size: 0.5em;
+	font-weight: normal;
+	vertical-align: middle;
+	margin-left: 10px;
+	color: #646970;
+}
+
+.timu-elc-byline-link {
+	text-decoration: none;
+	color: inherit;
+}
+
+.timu-elc-domain-rules {
+	margin-top: 1em;
+	max-width: 980px;
+}
+
+.timu-elc-domain-rules th,
+.timu-elc-domain-rules td {
+	vertical-align: middle;
+}
