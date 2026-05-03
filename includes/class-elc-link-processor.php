@@ -194,9 +194,15 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 				return $link_html;
 			}
 
+			$href_host  = TIMU_ELC_Host::host_for_href( $url );
+			$rule       = class_exists( 'TIMU_ELC_Domain_Rules' ) ? TIMU_ELC_Domain_Rules::match( $href_host ) : null;
 			$has_target = (bool) preg_match( '/\btarget\s*=/i', $link_html );
 
-			if ( ! empty( $options['new_tab'] ) && ! $has_target ) {
+			// Per-domain target override beats the global new-tab toggle.
+			if ( $rule && '' !== $rule['target'] && ! $has_target ) {
+				$link_html  = str_replace( '<a ', '<a target="' . esc_attr( $rule['target'] ) . '" ', $link_html );
+				$has_target = true;
+			} elseif ( ! empty( $options['new_tab'] ) && ! $has_target ) {
 				$link_html  = str_replace( '<a ', '<a target="_blank" ', $link_html );
 				$has_target = true;
 			}
@@ -212,8 +218,17 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 				$rel_to_add[] = 'noreferrer';
 			}
 
-			if ( ! empty( $options['nofollow'] ) ) {
+			$apply_nofollow = ! empty( $options['nofollow'] );
+			if ( $rule && ! empty( $rule['dofollow'] ) ) {
+				// Domain rule wins: explicitly dofollow / allowlist suppresses the global nofollow.
+				$apply_nofollow = false;
+			}
+			if ( $apply_nofollow ) {
 				$rel_to_add[] = 'nofollow';
+			}
+
+			if ( $rule && ! empty( $rule['sponsored'] ) ) {
+				$rel_to_add[] = 'sponsored';
 			}
 
 			if ( ! empty( $forced_rel ) ) {

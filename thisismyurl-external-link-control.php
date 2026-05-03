@@ -21,6 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-host.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-domain-rules.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-link-processor.php';
 
 class TIMU_ELC {
@@ -60,11 +61,49 @@ class TIMU_ELC {
     }
 
     public function register_plugin_settings() {
-        register_setting( 
-            'timu_elc_settings_group', 
-            'timu_elc_options', 
+        register_setting(
+            'timu_elc_settings_group',
+            'timu_elc_options',
             array( 'sanitize_callback' => array( $this, 'sanitize_plugin_options' ) )
         );
+        register_setting(
+            'timu_elc_settings_group',
+            TIMU_ELC_Domain_Rules::OPTION_KEY,
+            array( 'sanitize_callback' => array( $this, 'sanitize_domain_rules' ) )
+        );
+    }
+
+    /**
+     * Sanitize the per-domain rules table coming from the settings form.
+     *
+     * Form shape: timu_elc_domain_rules[N][domain|target|dofollow|sponsored|allowlist].
+     *
+     * @param mixed $input Raw POSTed value.
+     * @return array<int,array<string,mixed>>
+     */
+    public function sanitize_domain_rules( $input ) {
+        if ( ! is_array( $input ) ) {
+            return array();
+        }
+        $out = array();
+        foreach ( $input as $row ) {
+            if ( ! is_array( $row ) ) {
+                continue;
+            }
+            $candidate = array(
+                'domain'    => isset( $row['domain'] ) ? sanitize_text_field( $row['domain'] ) : '',
+                'target'    => isset( $row['target'] ) ? sanitize_text_field( $row['target'] ) : '',
+                'dofollow'  => ! empty( $row['dofollow'] ),
+                'sponsored' => ! empty( $row['sponsored'] ),
+                'allowlist' => ! empty( $row['allowlist'] ),
+            );
+            $normalised = TIMU_ELC_Domain_Rules::normalise_rule( $candidate );
+            if ( null !== $normalised ) {
+                $out[] = $normalised;
+            }
+        }
+        TIMU_ELC_Domain_Rules::reset_cache();
+        return $out;
     }
 
     public function sanitize_plugin_options( $input ) {
@@ -171,6 +210,69 @@ class TIMU_ELC {
                                             </td>
                                         </tr>
                                     </table>
+                                    <h2 class="title"><?php esc_html_e( 'Per-Domain Rules', 'thisismyurl-external-link-control' ); ?></h2>
+                                    <p class="description">
+                                        <?php esc_html_e( 'Override the global behaviour for specific domains. Use this for rel="me" / sameAs profiles you want left dofollow, paid placements that should always carry rel="sponsored", or first-party properties you want to open in the same tab.', 'thisismyurl-external-link-control' ); ?>
+                                    </p>
+                                    <table class="widefat striped timu-elc-domain-rules">
+                                        <thead>
+                                            <tr>
+                                                <th scope="col"><?php esc_html_e( 'Domain', 'thisismyurl-external-link-control' ); ?></th>
+                                                <th scope="col"><?php esc_html_e( 'Dofollow', 'thisismyurl-external-link-control' ); ?></th>
+                                                <th scope="col"><?php esc_html_e( 'Target', 'thisismyurl-external-link-control' ); ?></th>
+                                                <th scope="col"><?php esc_html_e( 'Sponsored', 'thisismyurl-external-link-control' ); ?></th>
+                                                <th scope="col"><?php esc_html_e( 'Allowlist (rel=me / sameAs)', 'thisismyurl-external-link-control' ); ?></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php
+                                            $rules = TIMU_ELC_Domain_Rules::all();
+                                            // Always render at least three blank rows so the form is usable on a fresh install.
+                                            $blank_rows = max( 0, 3 - count( $rules ) );
+                                            for ( $i = 0; $i < $blank_rows; $i++ ) {
+                                                $rules[] = array(
+                                                    'domain'    => '',
+                                                    'dofollow'  => false,
+                                                    'target'    => '',
+                                                    'sponsored' => false,
+                                                    'allowlist' => false,
+                                                );
+                                            }
+                                            foreach ( $rules as $i => $rule ) :
+                                                $name_prefix = 'timu_elc_domain_rules[' . (int) $i . ']';
+                                                ?>
+                                                <tr>
+                                                    <td>
+                                                        <label class="screen-reader-text" for="<?php echo esc_attr( 'timu_elc_dr_domain_' . $i ); ?>"><?php esc_html_e( 'Domain', 'thisismyurl-external-link-control' ); ?></label>
+                                                        <input type="text" id="<?php echo esc_attr( 'timu_elc_dr_domain_' . $i ); ?>" name="<?php echo esc_attr( $name_prefix . '[domain]' ); ?>" value="<?php echo esc_attr( $rule['domain'] ); ?>" placeholder="example.com" class="regular-text" />
+                                                    </td>
+                                                    <td>
+                                                        <label class="screen-reader-text" for="<?php echo esc_attr( 'timu_elc_dr_dofollow_' . $i ); ?>"><?php esc_html_e( 'Dofollow', 'thisismyurl-external-link-control' ); ?></label>
+                                                        <input type="checkbox" id="<?php echo esc_attr( 'timu_elc_dr_dofollow_' . $i ); ?>" name="<?php echo esc_attr( $name_prefix . '[dofollow]' ); ?>" value="1" <?php checked( true, ! empty( $rule['dofollow'] ) ); ?> />
+                                                    </td>
+                                                    <td>
+                                                        <label class="screen-reader-text" for="<?php echo esc_attr( 'timu_elc_dr_target_' . $i ); ?>"><?php esc_html_e( 'Target', 'thisismyurl-external-link-control' ); ?></label>
+                                                        <select id="<?php echo esc_attr( 'timu_elc_dr_target_' . $i ); ?>" name="<?php echo esc_attr( $name_prefix . '[target]' ); ?>">
+                                                            <option value="" <?php selected( '', $rule['target'] ); ?>><?php esc_html_e( 'Inherit', 'thisismyurl-external-link-control' ); ?></option>
+                                                            <option value="_blank" <?php selected( '_blank', $rule['target'] ); ?>>_blank</option>
+                                                            <option value="_self" <?php selected( '_self', $rule['target'] ); ?>>_self</option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <label class="screen-reader-text" for="<?php echo esc_attr( 'timu_elc_dr_sponsored_' . $i ); ?>"><?php esc_html_e( 'Sponsored', 'thisismyurl-external-link-control' ); ?></label>
+                                                        <input type="checkbox" id="<?php echo esc_attr( 'timu_elc_dr_sponsored_' . $i ); ?>" name="<?php echo esc_attr( $name_prefix . '[sponsored]' ); ?>" value="1" <?php checked( true, ! empty( $rule['sponsored'] ) ); ?> />
+                                                    </td>
+                                                    <td>
+                                                        <label class="screen-reader-text" for="<?php echo esc_attr( 'timu_elc_dr_allowlist_' . $i ); ?>"><?php esc_html_e( 'Allowlist', 'thisismyurl-external-link-control' ); ?></label>
+                                                        <input type="checkbox" id="<?php echo esc_attr( 'timu_elc_dr_allowlist_' . $i ); ?>" name="<?php echo esc_attr( $name_prefix . '[allowlist]' ); ?>" value="1" <?php checked( true, ! empty( $rule['allowlist'] ) ); ?> />
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                    <p class="description">
+                                        <?php esc_html_e( 'Tip: leave a row\'s domain blank to delete it on save. Subdomains inherit the parent rule (a rule on linkedin.com applies to www.linkedin.com automatically).', 'thisismyurl-external-link-control' ); ?>
+                                    </p>
                                     <?php submit_button( __( 'Update Link Settings', 'thisismyurl-external-link-control' ) ); ?>
                                 </form>
                             </div>
