@@ -4,7 +4,7 @@ Tags: external links, nofollow, target blank, seo, link management
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.251231
+Stable tag: 0.6123
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -82,11 +82,13 @@ I review PRs thoughtfully and appreciate well-tested contributions. Contributing
 
 == Changelog ==
 
+= 0.6123 =
+* Align plugin header version and readme Stable tag on the `x.Yddd` Julian-day scheme.
+* No functional changes; release-engineering hygiene for the audit cycle on 2026-05-03.
+
 = 1.251231 =
-* Current release with basic external link controls
-* Adds support for opening external links in a new tab
-* Adds support for applying `nofollow noopener noreferrer`
-* Keeps modifications at render time rather than rewriting content
+* Pre-audit baseline with basic external link controls (master switch, force new tab, nofollow).
+* Modifies links at render time without rewriting database content.
 
 = 1.0.0 =
 * Initial release
