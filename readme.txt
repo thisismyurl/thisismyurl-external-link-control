@@ -64,7 +64,7 @@ If they're helpful, here are genuine ways to support the work:
 
 = I found a bug or have a feature idea =
 
-* **File an issue on GitHub:** Visit https://github.com/thisismyurl/[plugin-name]/issues and include your WordPress and PHP version.
+* **File an issue on GitHub:** Visit https://github.com/thisismyurl/thisismyurl-external-link-control/issues and include your WordPress and PHP version.
 * **Start a discussion:** Use the Discussions tab on GitHub for questions or ideas.
 
 = I want to contribute code =
@@ -80,11 +80,29 @@ Code contributions are welcome and genuinely valuable:
 I review PRs thoughtfully and appreciate well-tested contributions. Contributing is never required, but it's genuinely helpful.
 
 
+== Screenshots ==
+
+1. The Tools > Link Control settings screen, with the master switch, force new tab, nofollow, and comment UGC toggles.
+2. The per-domain rules table, showing dofollow allowlist, target override, and rel="sponsored" controls for individual domains.
+
 == Changelog ==
 
 = 0.6123 =
-* Align plugin header version and readme Stable tag on the `x.Yddd` Julian-day scheme.
-* No functional changes; release-engineering hygiene for the audit cycle on 2026-05-03.
+* New: per-domain rules table — override nofollow, target, and sponsored on a per-domain basis. Dedicated "allowlist" column for rel=me / sameAs profile domains.
+* New: rel="ugc" automatically applied to external links inside comments (controlled by a new "Comment UGC" setting, on by default for fresh installs).
+* New: per-link rel="sponsored" opt-in via a `data-rel-sponsored="1"` attribute on the editor side.
+* New: filter coverage now includes `the_excerpt`, `widget_text_content`, `widget_block_content`, and the FSE `render_block` hook for navigation, query loop, post content, social link, and post title blocks.
+* New: render-time object cache keyed on post ID + post_modified_gmt + options hash + content hash, so the link rewrite no longer recomputes on every render.
+* New: WP-CLI commands `wp elc audit` (list external domains and counts) and `wp elc rewrite --dry-run` (preview a rewrite without touching the DB).
+* New: filterable hook priority via `timu_elc_priority` (defaults to 99) and filterable block-type list via `timu_elc_block_types`.
+* New: filterable internal/external decision via `timu_elc_is_external` so multisite siblings, staging mirrors, and first-party shorteners can be carved out cleanly.
+* New: visually-hidden "(opens in new tab)" text appended whenever the plugin forces target="_blank", so screen reader users get the warning.
+* Fix: switched from substring `strpos($url, $site_url)` to a proper host comparison via `wp_parse_url()`. Subdomains of the site host are correctly treated as internal; protocol-relative URLs (`//host/...`) are no longer silently skipped.
+* Fix: `noopener noreferrer` is now always forced on any external link with target="_blank", regardless of whether the editor or the plugin set the target. Decoupled from the nofollow toggle.
+* Fix: rel attribute merging preserves existing tokens (rel="me", rel="author", custom values) instead of overwriting them.
+* Fix: anchor walking switched from a regex to `WP_HTML_Tag_Processor` (with regex fallback for WP < 6.2). Anchors inside `<code>`, `<pre>`, `<script>` (including JSON-LD), and `<style>` blocks are no longer mutated.
+* Fix: header `Version` and readme `Stable tag` aligned on the `x.Yddd` Julian-day scheme. Plugin-row Donate link, settings-screen byline link, and Donate button all carry `rel="noopener noreferrer"`.
+* Chore: minimum WP raised to 6.2; tested up to 6.7. Inline `style=""` attributes replaced with an enqueued admin stylesheet. Singleton instance guard. Unused `assets/js/admin.js` and `js/tracking.js` removed.
 
 = 1.251231 =
 * Pre-audit baseline with basic external link controls (master switch, force new tab, nofollow).
@@ -92,6 +110,11 @@ I review PRs thoughtfully and appreciate well-tested contributions. Contributing
 
 = 1.0.0 =
 * Initial release
+
+== Upgrade Notice ==
+
+= 0.6123 =
+Major audit-driven overhaul. Adds per-domain rules, rel="ugc" on comments, rel="sponsored" support, FSE block coverage, render-time caching, accessibility text on forced new-tab links, and WP-CLI commands. Fixes a subdomain-misclassification bug in the internal-link detection, ensures `noopener noreferrer` always lands on `target="_blank"`, and stops mutating links inside `<code>` / `<pre>` / JSON-LD blocks. Minimum WP raised to 6.2.
 
 == License ==
 
