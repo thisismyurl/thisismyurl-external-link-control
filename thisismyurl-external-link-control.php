@@ -4,7 +4,7 @@
  * Plugin URI:        https://thisismyurl.com/external-link-control
  * Description:       Globally manage external link behavior, including nofollow and target attributes.
  * Version:           0.6123
- * Requires at least: 6.0
+ * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            Christopher Ross
  * Author URI:        https://thisismyurl.com/
