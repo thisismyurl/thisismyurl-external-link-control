@@ -32,12 +32,39 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 		private $options;
 
 		/**
+		 * Per-call context: extra rel tokens forced on every external link
+		 * processed by this instance (e.g., 'ugc' when called from comment_text).
+		 *
+		 * @var array<string>
+		 */
+		private $forced_rel = array();
+
+		/**
 		 * Constructor.
 		 *
 		 * @param array<string,int>|null $options Options array; if null, pulled from wp_options.
 		 */
 		public function __construct( $options = null ) {
 			$this->options = is_array( $options ) ? $options : (array) get_option( 'timu_elc_options', array() );
+		}
+
+		/**
+		 * Force one or more rel tokens onto every external link this
+		 * processor touches. Used by the comment_text path to add `ugc`.
+		 *
+		 * @param array<string> $tokens Rel tokens.
+		 * @return self
+		 */
+		public function force_rel( array $tokens ) {
+			$this->forced_rel = array_values(
+				array_unique(
+					array_merge(
+						$this->forced_rel,
+						array_map( 'strtolower', array_filter( $tokens, 'is_string' ) )
+					)
+				)
+			);
+			return $this;
 		}
 
 		/**
@@ -129,12 +156,13 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 		 * @return string
 		 */
 		public function transform( $content ) {
-			$options = $this->options;
+			$options    = $this->options;
+			$forced_rel = $this->forced_rel;
 
 			return preg_replace_callback(
 				'/<a\s[^>]*href=["\']([^"\']*)["\'][^>]*>/i',
-				static function ( $matches ) use ( $options ) {
-					return self::rewrite_anchor_tag( $matches[0], $matches[1], $options );
+				static function ( $matches ) use ( $options, $forced_rel ) {
+					return self::rewrite_anchor_tag( $matches[0], $matches[1], $options, $forced_rel );
 				},
 				$content
 			);
@@ -155,12 +183,13 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 		 * Existing rel tokens are preserved; new tokens are merged in. We
 		 * never replace a rel attribute the editor wrote (e.g. rel="me").
 		 *
-		 * @param string             $link_html Original `<a ...>` opening tag.
-		 * @param string             $url       href value.
-		 * @param array<string,int>  $options   Plugin options snapshot.
+		 * @param string             $link_html  Original `<a ...>` opening tag.
+		 * @param string             $url        href value.
+		 * @param array<string,int>  $options    Plugin options snapshot.
+		 * @param array<string>      $forced_rel Tokens forced by caller (e.g. 'ugc' on comment_text).
 		 * @return string Possibly-rewritten opening tag.
 		 */
-		private static function rewrite_anchor_tag( $link_html, $url, $options ) {
+		private static function rewrite_anchor_tag( $link_html, $url, $options, $forced_rel = array() ) {
 			if ( ! TIMU_ELC_Host::is_external( $url ) ) {
 				return $link_html;
 			}
@@ -185,6 +214,17 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 
 			if ( ! empty( $options['nofollow'] ) ) {
 				$rel_to_add[] = 'nofollow';
+			}
+
+			if ( ! empty( $forced_rel ) ) {
+				$rel_to_add = array_merge( $rel_to_add, $forced_rel );
+			}
+
+			// Per-link sponsored opt-in via `data-rel-sponsored="1"` on the editor side.
+			// Lets editorial flag a paid placement without exposing the plugin
+			// settings UI to non-admins.
+			if ( preg_match( '/\bdata-rel-sponsored\s*=\s*["\']1["\']/i', $link_html ) ) {
+				$rel_to_add[] = 'sponsored';
 			}
 
 			if ( empty( $rel_to_add ) ) {

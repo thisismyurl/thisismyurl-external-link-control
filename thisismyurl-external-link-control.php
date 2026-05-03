@@ -30,6 +30,7 @@ class TIMU_ELC {
         add_action( 'admin_menu', array( $this, 'create_tools_page' ) );
         add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'add_plugin_action_links' ) );
         add_filter( 'the_content', array( $this, 'modify_external_links' ), 99 );
+        add_filter( 'comment_text', array( $this, 'modify_comment_links' ), 99 );
 
         // Set defaults upon activation.
         register_activation_hook( __FILE__, array( $this, 'activate_plugin_defaults' ) );
@@ -41,11 +42,12 @@ class TIMU_ELC {
      */
     public function activate_plugin_defaults() {
         if ( false === get_option( 'timu_elc_options' ) ) {
-            update_option( 'timu_elc_options', array(
-                'enabled'  => 1,
-                'new_tab'  => 1,
-                'nofollow' => 1,
-            ) );
+            add_option( 'timu_elc_options', array(
+                'enabled'      => 1,
+                'new_tab'      => 1,
+                'nofollow'     => 1,
+                'comment_ugc'  => 1,
+            ), '', 'no' );
         }
     }
 
@@ -67,9 +69,10 @@ class TIMU_ELC {
 
     public function sanitize_plugin_options( $input ) {
         $new_input = array();
-        $new_input['enabled']   = isset( $input['enabled'] ) ? 1 : 0;
-        $new_input['new_tab']   = isset( $input['new_tab'] ) ? 1 : 0;
-        $new_input['nofollow']  = isset( $input['nofollow'] ) ? 1 : 0;
+        $new_input['enabled']     = isset( $input['enabled'] ) ? 1 : 0;
+        $new_input['new_tab']     = isset( $input['new_tab'] ) ? 1 : 0;
+        $new_input['nofollow']    = isset( $input['nofollow'] ) ? 1 : 0;
+        $new_input['comment_ugc'] = isset( $input['comment_ugc'] ) ? 1 : 0;
         return $new_input;
     }
 
@@ -90,6 +93,27 @@ class TIMU_ELC {
         }
         $post = get_post();
         return $processor->process( $content, $post instanceof WP_Post ? $post : null );
+    }
+
+    /**
+     * Apply external-link rules to a single comment, with `ugc` forced
+     * onto every external link per Google's webmaster guidance for
+     * user-generated content.
+     */
+    public function modify_comment_links( $content ) {
+        $processor = new TIMU_ELC_Link_Processor();
+        if ( ! $processor->enabled() ) {
+            return $content;
+        }
+
+        $options = get_option( 'timu_elc_options', array() );
+        if ( ! empty( $options['comment_ugc'] ) ) {
+            $processor->force_rel( array( 'ugc' ) );
+        }
+
+        // Comments don't have a stable post_modified_gmt of their own usable
+        // here; pass null to skip the post-keyed cache.
+        return $processor->transform( $content );
     }
 
     public function render_plugin_admin_ui() {
@@ -137,6 +161,13 @@ class TIMU_ELC {
                                             <td>
                                                 <input type="checkbox" id="timu_elc_nofollow" name="timu_elc_options[nofollow]" value="1" <?php checked( 1, isset( $options['nofollow'] ) ? $options['nofollow'] : 0 ); ?> />
                                                 <label for="timu_elc_nofollow"><?php esc_html_e( "Protect link equity with 'nofollow'.", 'thisismyurl-external-link-control' ); ?></label>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th scope="row"><?php esc_html_e( 'Comment UGC', 'thisismyurl-external-link-control' ); ?></th>
+                                            <td>
+                                                <input type="checkbox" id="timu_elc_comment_ugc" name="timu_elc_options[comment_ugc]" value="1" <?php checked( 1, isset( $options['comment_ugc'] ) ? $options['comment_ugc'] : 0 ); ?> />
+                                                <label for="timu_elc_comment_ugc"><?php esc_html_e( "Add rel='ugc' to external links inside comments (Google's recommended attribute for user-generated content).", 'thisismyurl-external-link-control' ); ?></label>
                                             </td>
                                         </tr>
                                     </table>
