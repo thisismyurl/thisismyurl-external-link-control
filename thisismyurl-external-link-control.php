@@ -21,6 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-host.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-link-processor.php';
 
 class TIMU_ELC {
 
@@ -83,27 +84,12 @@ class TIMU_ELC {
     }
 
     public function modify_external_links( $content ) {
-        $options = get_option( 'timu_elc_options' );
-        if ( empty( $options['enabled'] ) ) {
+        $processor = new TIMU_ELC_Link_Processor();
+        if ( ! $processor->enabled() ) {
             return $content;
         }
-
-        return preg_replace_callback( '/<a\s[^>]*href=["\']([^"\']*)["\'][^>]*>/i', function( $matches ) use ( $options ) {
-            $link_html = $matches[0];
-            $url       = $matches[1];
-
-            if ( ! TIMU_ELC_Host::is_external( $url ) ) {
-                return $link_html;
-            }
-
-            if ( ! empty( $options['new_tab'] ) && false === strpos( $link_html, 'target=' ) ) {
-                $link_html = str_replace( '<a ', '<a target="_blank" ', $link_html );
-            }
-            if ( ! empty( $options['nofollow'] ) && false === strpos( $link_html, 'rel=' ) ) {
-                $link_html = str_replace( '<a ', '<a rel="nofollow noopener noreferrer" ', $link_html );
-            }
-            return $link_html;
-        }, $content );
+        $post = get_post();
+        return $processor->process( $content, $post instanceof WP_Post ? $post : null );
     }
 
     public function render_plugin_admin_ui() {
