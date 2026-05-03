@@ -159,12 +159,127 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 			$options    = $this->options;
 			$forced_rel = $this->forced_rel;
 
+			// Pre-pass: extract regions whose link content must NOT be
+			// modified — code samples, pre-formatted text, scripts (which
+			// includes JSON-LD via type="application/ld+json"), and inline
+			// styles. Replace each with a placeholder, transform the
+			// remainder, then restore. This is more robust than trying to
+			// teach a single regex to look-behind across nested tags.
+			$skipped  = array();
+			$pattern  = '#<(code|pre|script|style)\b[^>]*>.*?</\1>#is';
+			$prepared = preg_replace_callback(
+				$pattern,
+				static function ( $m ) use ( &$skipped ) {
+					$idx                = count( $skipped );
+					$skipped[ '__TIMU_ELC_SKIP_' . $idx . '__' ] = $m[0];
+					return '__TIMU_ELC_SKIP_' . $idx . '__';
+				},
+				$content
+			);
+
+			if ( null === $prepared ) {
+				// preg_replace_callback returned null on malformed input;
+				// fall back to direct regex transform on the original.
+				$prepared = $content;
+				$skipped  = array();
+			}
+
+			$transformed = self::transform_anchors( $prepared, $options, $forced_rel );
+
+			if ( ! empty( $skipped ) ) {
+				$transformed = strtr( $transformed, $skipped );
+			}
+
+			return $transformed;
+		}
+
+		/**
+		 * Walk anchor tags in HTML and rewrite each one. Uses
+		 * WP_HTML_Tag_Processor (WP 6.2+) when available so we get a
+		 * proper attribute parser instead of a regex; falls back to the
+		 * regex path on older cores.
+		 *
+		 * @param string             $html       HTML chunk.
+		 * @param array<string,int>  $options    Options snapshot.
+		 * @param array<string>      $forced_rel Tokens forced by caller.
+		 * @return string
+		 */
+		private static function transform_anchors( $html, $options, $forced_rel ) {
+			if ( class_exists( 'WP_HTML_Tag_Processor' ) ) {
+				$tags = new WP_HTML_Tag_Processor( $html );
+				while ( $tags->next_tag( 'a' ) ) {
+					$href = $tags->get_attribute( 'href' );
+					if ( ! is_string( $href ) || ! TIMU_ELC_Host::is_external( $href ) ) {
+						continue;
+					}
+
+					$existing_target = $tags->get_attribute( 'target' );
+					$existing_rel    = $tags->get_attribute( 'rel' );
+
+					$href_host = TIMU_ELC_Host::host_for_href( $href );
+					$rule      = class_exists( 'TIMU_ELC_Domain_Rules' ) ? TIMU_ELC_Domain_Rules::match( $href_host ) : null;
+
+					$target = $existing_target;
+					if ( null === $existing_target || '' === $existing_target ) {
+						if ( $rule && '' !== $rule['target'] ) {
+							$target = $rule['target'];
+							$tags->set_attribute( 'target', $target );
+						} elseif ( ! empty( $options['new_tab'] ) ) {
+							$target = '_blank';
+							$tags->set_attribute( 'target', '_blank' );
+						}
+					}
+
+					$rel_to_add = array();
+
+					if ( '_blank' === $target ) {
+						$rel_to_add[] = 'noopener';
+						$rel_to_add[] = 'noreferrer';
+					}
+
+					$apply_nofollow = ! empty( $options['nofollow'] );
+					if ( $rule && ! empty( $rule['dofollow'] ) ) {
+						$apply_nofollow = false;
+					}
+					if ( $apply_nofollow ) {
+						$rel_to_add[] = 'nofollow';
+					}
+
+					if ( $rule && ! empty( $rule['sponsored'] ) ) {
+						$rel_to_add[] = 'sponsored';
+					}
+
+					if ( ! empty( $forced_rel ) ) {
+						$rel_to_add = array_merge( $rel_to_add, $forced_rel );
+					}
+
+					$data_sponsored = $tags->get_attribute( 'data-rel-sponsored' );
+					if ( '1' === (string) $data_sponsored ) {
+						$rel_to_add[] = 'sponsored';
+					}
+
+					if ( empty( $rel_to_add ) ) {
+						continue;
+					}
+
+					$existing_tokens = is_string( $existing_rel )
+						? preg_split( '/\s+/', strtolower( trim( $existing_rel ) ), -1, PREG_SPLIT_NO_EMPTY )
+						: array();
+					$existing_tokens = is_array( $existing_tokens ) ? $existing_tokens : array();
+					$rel_to_add      = array_map( 'strtolower', $rel_to_add );
+					$merged          = array_values( array_unique( array_merge( $existing_tokens, $rel_to_add ) ) );
+					$tags->set_attribute( 'rel', implode( ' ', $merged ) );
+				}
+				return $tags->get_updated_html();
+			}
+
+			// Fallback for WP < 6.2.
 			return preg_replace_callback(
 				'/<a\s[^>]*href=["\']([^"\']*)["\'][^>]*>/i',
 				static function ( $matches ) use ( $options, $forced_rel ) {
 					return self::rewrite_anchor_tag( $matches[0], $matches[1], $options, $forced_rel );
 				},
-				$content
+				$html
 			);
 		}
 
