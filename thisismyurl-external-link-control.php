@@ -190,13 +190,42 @@ class TIMU_ELC {
         );
     }
 
+    /**
+     * Determine whether external-link processing should run in the current context.
+     *
+     * Returns the boolean result of the `timu_elc_should_filter` filter,
+     * which receives the current WP_Post (or null) and defaults to true.
+     *
+     * Usage examples:
+     *
+     *   // Disable processing on all attachment post type pages.
+     *   add_filter( 'timu_elc_should_filter', function ( $should, $post ) {
+     *       return $post && 'attachment' !== $post->post_type;
+     *   }, 10, 2 );
+     *
+     *   // Disable processing for a specific post ID.
+     *   add_filter( 'timu_elc_should_filter', function ( $should, $post ) {
+     *       return $post && 42 !== (int) $post->ID;
+     *   }, 10, 2 );
+     *
+     * @param WP_Post|null $post Current post object, if available.
+     * @return bool
+     */
+    private function should_filter_post( $post ) {
+        return (bool) apply_filters( 'timu_elc_should_filter', true, $post );
+    }
+
     public function modify_external_links( $content ) {
         $processor = new TIMU_ELC_Link_Processor();
         if ( ! $processor->enabled() ) {
             return $content;
         }
         $post = get_post();
-        return $processor->process( $content, $post instanceof WP_Post ? $post : null );
+        $post = $post instanceof WP_Post ? $post : null;
+        if ( ! $this->should_filter_post( $post ) ) {
+            return $content;
+        }
+        return $processor->process( $content, $post );
     }
 
     /**
@@ -247,6 +276,11 @@ class TIMU_ELC {
             return $block_content;
         }
 
+        $post = get_post();
+        if ( ! $this->should_filter_post( $post instanceof WP_Post ? $post : null ) ) {
+            return $block_content;
+        }
+
         // Block render output is per-block, not per-post; cache key would
         // need a block-content-hash dimension. Skip the cache and run direct.
         return $processor->transform( $block_content );
@@ -260,6 +294,12 @@ class TIMU_ELC {
     public function modify_comment_links( $content ) {
         $processor = new TIMU_ELC_Link_Processor();
         if ( ! $processor->enabled() ) {
+            return $content;
+        }
+
+        // Comments are not bound to a single WP_Post in the same loop sense;
+        // pass null so the should_filter hook can still run.
+        if ( ! $this->should_filter_post( get_post() instanceof WP_Post ? get_post() : null ) ) {
             return $content;
         }
 
