@@ -24,6 +24,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-host.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-domain-rules.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-link-processor.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-rest.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-link-checker.php';
 
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
     require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-cli.php';
@@ -63,6 +64,8 @@ class TIMU_ELC {
         add_action( 'admin_menu', array( $this, 'create_tools_page' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
         add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'add_plugin_action_links' ) );
+
+        new ELC_Link_Checker();
         $priority = (int) apply_filters( 'timu_elc_priority', 99 );
 
         add_filter( 'the_content', array( $this, 'modify_external_links' ), $priority );
@@ -80,6 +83,7 @@ class TIMU_ELC {
 
         // Set defaults upon activation.
         register_activation_hook( __FILE__, array( $this, 'activate_plugin_defaults' ) );
+        register_deactivation_hook( __FILE__, array( 'ELC_Link_Checker', 'deactivate' ) );
     }
 
     /**
