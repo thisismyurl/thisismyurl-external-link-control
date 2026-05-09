@@ -1,5 +1,5 @@
-/**
- * External Link Control — admin styles.
+﻿/**
+ * External Link Control â€” admin styles.
  *
  * Replaces the inline `style=` attributes used in 0.6112 (plugin row link
  * styling, settings page byline). Enqueued only on plugins.php and on the
@@ -29,10 +29,11 @@
 
 .timu-elc-domain-rules {
 	margin-top: 1em;
-	max-width: 980px;
+	max-width: 100%;
 }
 
 .timu-elc-domain-rules th,
 .timu-elc-domain-rules td {
 	vertical-align: middle;
 }
+
