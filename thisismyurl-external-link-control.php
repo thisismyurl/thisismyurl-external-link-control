@@ -9,11 +9,11 @@
  * Author:            Christopher Ross
  * Author URI:        https://thisismyurl.com/
  * Text Domain:       thisismyurl-external-link-control
- * License:           GPLv2 or later
+ * License:           GPL-2.0-or-later
  * Donate link:       https://thisismyurl.com/donate/
  * GitHub Plugin URI: https://github.com/thisismyurl/thisismyurl-external-link-control
  * Primary Branch:    main
- * * @package TIMU_ELC
+ * @package TIMU_ELC
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
