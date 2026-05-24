@@ -1,4 +1,4 @@
-=== External Link Control ===
+=== This Is My URL - External Link Control ===
 Contributors: thisismyurl
 Donate link: https://github.com/sponsors/thisismyurl
 Tags: external links, nofollow, target blank, seo, link management

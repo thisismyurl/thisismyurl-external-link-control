@@ -1,4 +1,4 @@
-# External Link Control by This Is My URL
+# This Is My URL - External Link Control
 
 [![CI](https://github.com/thisismyurl/thisismyurl-external-link-control/actions/workflows/ci.yml/badge.svg)](https://github.com/thisismyurl/thisismyurl-external-link-control/actions/workflows/ci.yml) [![WordPress Tested](https://img.shields.io/badge/WordPress-6.6%2B-blue)](https://wordpress.org/) [![License](https://img.shields.io/badge/License-GPL--2.0-blue)](LICENSE)
 

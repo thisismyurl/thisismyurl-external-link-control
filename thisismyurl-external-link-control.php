@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       External Link Control by thisismyurl.com
+ * Plugin Name:       This Is My URL - External Link Control
  * Plugin URI:        https://thisismyurl.com/external-link-control
  * Description:       Globally manage external link behavior, including nofollow and target attributes.
  * Version:           1.6143
@@ -10,7 +10,7 @@
  * Author URI:        https://thisismyurl.com/
  * Text Domain:       thisismyurl-external-link-control
  * License:           GPL-2.0-or-later
- * Donate link:       https://thisismyurl.com/donate/
+ * Donate link:       https://github.com/sponsors/thisismyurl
  * GitHub Plugin URI: https://github.com/thisismyurl/thisismyurl-external-link-control
  * Primary Branch:    main
  * @package TIMU_ELC
@@ -104,7 +104,7 @@ class TIMU_ELC {
     public function add_plugin_action_links( $links ) {
         $custom_links = array(
             '<a href="' . esc_url( admin_url( 'tools.php?page=thisismyurl-external-link-control' ) ) . '">' . esc_html__( 'Settings', 'thisismyurl-external-link-control' ) . '</a>',
-            '<a href="https://thisismyurl.com/donate/" target="_blank" rel="noopener noreferrer" class="timu-elc-donate-link">' . esc_html__( 'Donate', 'thisismyurl-external-link-control' ) . '</a>',
+            '<a href="' . esc_url( 'https://github.com/sponsors/thisismyurl' ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Sponsor', 'thisismyurl-external-link-control' ) . '</a>',
         );
         return array_merge( $custom_links, $links );
     }
@@ -451,7 +451,7 @@ class TIMU_ELC {
                             <div class="inside">
                                 <p><?php esc_html_e( 'This plugin modifies links dynamically during page render, keeping your database clean.', 'thisismyurl-external-link-control' ); ?></p>
                                 <hr />
-                                <p><a href="https://thisismyurl.com/donate/" class="button button-secondary" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Donate to Development', 'thisismyurl-external-link-control' ); ?></a></p>
+                                <p><a href="<?php echo esc_url( 'https://github.com/sponsors/thisismyurl' ); ?>" class="button button-secondary" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Sponsor development', 'thisismyurl-external-link-control' ); ?></a></p>
                             </div>
                         </div>
                     </div>
