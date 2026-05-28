@@ -37,3 +37,72 @@
 	vertical-align: middle;
 }
 
+/* Broken-links dashboard widget (since 1.6148). */
+.timu-elc-widget h4 {
+	margin: 1.2em 0 0.2em;
+}
+
+.timu-elc-widget .timu-elc-unverified-head,
+.timu-elc-widget .timu-elc-ignored-head {
+	color: #646970;
+}
+
+.timu-elc-widget .timu-elc-clear {
+	color: #007017;
+	font-weight: 600;
+}
+
+.timu-elc-actions {
+	margin: 0.6em 0;
+}
+
+.timu-elc-actions .timu-elc-status {
+	margin-left: 0.6em;
+	color: #646970;
+	font-style: italic;
+}
+
+.timu-elc-link-list {
+	margin: 0.2em 0 0;
+}
+
+.timu-elc-link-list li {
+	padding: 0.35em 0;
+	border-top: 1px solid #f0f0f1;
+	word-break: break-word;
+}
+
+.timu-elc-link-list code {
+	background: transparent;
+	padding: 0;
+}
+
+.timu-elc-link-list .timu-elc-code {
+	color: #646970;
+	font-size: 0.9em;
+	white-space: nowrap;
+}
+
+.timu-elc-link-list.timu-elc-broken .timu-elc-code {
+	color: #b32d2e;
+}
+
+.timu-elc-row-actions {
+	display: inline-block;
+	margin-left: 0.4em;
+	white-space: nowrap;
+}
+
+.timu-elc-row-actions .button-link {
+	color: #2271b1;
+}
+
+.timu-elc-row-actions .timu-elc-ignore {
+	color: #646970;
+}
+
+.timu-elc-link-list .timu-elc-more {
+	border-top: 1px solid #f0f0f1;
+	color: #646970;
+}
+

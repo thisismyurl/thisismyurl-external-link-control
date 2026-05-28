@@ -5,7 +5,7 @@ Tags: external links, nofollow, target blank, seo, link management
 Requires at least: 6.2
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.6147
+Stable tag: 1.6148
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -88,6 +88,15 @@ I review PRs thoughtfully and appreciate well-tested contributions. Contributing
 
 == Changelog ==
 
+= 1.6148 =
+* Fix: the broken-link admin notice now stays dismissed. Earlier versions shipped no JavaScript, so WordPress's dismiss "X" only hid the notice for that page load and never told the server — it reappeared on the next screen. Dismissing now records which links were dismissed; the notice only returns when a later scan finds a link that was not in the dismissed set.
+* Fix: far fewer false positives. A 401, 403, 405, 429, 451, or 999 response (login walls, bot protection, rate limits, servers that reject HEAD) is no longer reported as broken — these mean "the link exists, I just won't let an automated checker confirm it." Only 404, 410, and dead domains (a host that no longer resolves) count as broken. HEAD requests that fail now retry once with GET before any verdict, so HEAD-hostile servers stop showing up as broken.
+* New: an ignore list. Use the "Ignore" button next to any link in the Broken Links dashboard widget to stop hearing about a URL or a whole host; manage it from the same widget ("Stop ignoring"). Ignored links are skipped during the scan, so they cost no request.
+* New: a "Scan now" button in the dashboard widget — run the check on demand instead of waiting for the weekly cron.
+* New: a "Could not verify" section in the widget lists links that answered but blocked the check, for transparency, without raising the notice.
+* New: per-link "Recheck" button to re-test a single URL immediately.
+* New: `timu_elc_broken_status_codes` filter to tune which HTTP status codes count as broken (defaults to 404 and 410).
+
 = 1.6147 =
 * Unified plugin versioning to the x.Yddd calendar-version scheme.
 * Confirmed compatibility with WordPress 7.0.
@@ -122,6 +131,9 @@ I review PRs thoughtfully and appreciate well-tested contributions. Contributing
 * Initial release
 
 == Upgrade Notice ==
+
+= 1.6148 =
+Broken-link checker overhaul: notice dismissals now stick, an ignore list lets you mute links you do not care about, a "Scan now" button runs the check on demand, and false positives (403/405/429 and HEAD-hostile servers like LinkedIn) are no longer reported as broken. Only genuine 404/410/dead-domain links raise the notice.
 
 = 0.6123 =
 Major audit-driven overhaul. Adds per-domain rules, rel="ugc" on comments, rel="sponsored" support, FSE block coverage, render-time caching, accessibility text on forced new-tab links, and WP-CLI commands. Fixes a subdomain-misclassification bug in the internal-link detection, ensures `noopener noreferrer` always lands on `target="_blank"`, and stops mutating links inside `<code>` / `<pre>` / JSON-LD blocks. Minimum WP raised to 6.2.
