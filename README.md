@@ -9,12 +9,24 @@ Control outbound link behaviour across your WordPress site — adding `nofollow`
 - Enable or disable external link filtering globally from one settings screen.
 - Open external links in a new tab with `target="_blank"`.
 - Add `rel="nofollow noopener noreferrer"` to external links automatically.
+- Monitor outbound links for breakage on a weekly schedule, with an ignore list, an on-demand "Scan now", and a dashboard widget.
 - Leaves your database content untouched — all changes happen during output rendering.
 - Internal links are always left alone.
 
 ## How it works
 
 The plugin hooks into the `the_content` filter and rewrites only external `http` and `https` links during rendering. No post content is stored differently; your editorial data stays clean.
+
+## Broken-link monitoring
+
+A weekly background scan checks your external links and reports the results in a **Tools → dashboard** widget. It is built to be honest about what "broken" means:
+
+- **Only genuine breaks raise a notice.** A link counts as broken when it returns `404`, `410`, or its domain no longer resolves. Responses that simply block automated checks — `401`, `403`, `405`, `429`, `451`, `999`, rate limits, and server hiccups — are listed under "Could not verify" instead, never as broken. (LinkedIn answering `405` to a `HEAD` request is the classic false positive this avoids.)
+- **HEAD-hostile servers get a GET retry.** If a `HEAD` request fails, the checker retries once with a ranged `GET` before deciding, so CDNs and servers that reject `HEAD` are not mislabelled.
+- **Dismissals stick.** Dismissing the notice records exactly which links were dismissed; it only returns when a later scan finds a link that was not in the dismissed set, rather than every time the same known links recur.
+- **An ignore list.** Mute any URL or whole host with one click; ignored links are skipped during the scan entirely. "Scan now" and per-link "Recheck" let you verify on demand.
+
+Tune which status codes count as broken with the `timu_elc_broken_status_codes` filter (defaults to `404` and `410`).
 
 ## Requirements
 

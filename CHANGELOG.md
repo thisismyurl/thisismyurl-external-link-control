@@ -2,6 +2,33 @@
 
 All notable changes to **External Link Control by thisismyurl.com** are recorded here. The plugin uses a `x.Yddd` Julian-day version scheme: `x` is the release class (`0` = pre-release, `1` = full), `Y` is the last digit of the year, and `ddd` is the day of year (001-366).
 
+## 1.6148 — 2026-05-27
+
+Broken-link checker overhaul. Addresses the un-dismissable notice, false positives on bot-blocked hosts, and the lack of any way to mute links the owner does not care about.
+
+### Fixed
+- **The dismiss button now persists.** The plugin shipped no JavaScript, so the core `is-dismissible` "X" only removed the notice from the DOM for the current page load — the AJAX dismiss endpoint that flips the stored flag was never called, and the notice returned on the next admin screen. A small `assets/js/admin.js` now records the dismissal server-side.
+- **Dismissals are remembered per link set, not globally.** The results option now stores a `dismissed_urls` fingerprint instead of a single boolean. The notice only reappears when a later scan finds a broken URL that was not in the dismissed set — recurring known-broken links stay quiet until they are fixed or a genuinely new break appears. The scan no longer blindly resets the dismissed flag on every run.
+- **Far fewer false positives.** Classification now sorts results into `broken` (404, 410, or a dead domain whose host no longer resolves) versus `unverified` (401/403/405/429/451/999, other non-2xx/3xx, and transient network errors such as timeouts and TLS failures). Only `broken` raises the notice. LinkedIn (405 to HEAD) and time.com (403 to bots) no longer count as broken.
+- **HEAD-hostile servers get a GET retry.** A HEAD that returns 400/403/405/406/501 or errors is retried once with `GET` (asking for a single byte via `Range`) before any verdict, so servers and CDNs that reject HEAD stop registering as broken.
+
+### Added
+- **Ignore list** (`timu_elc_broken_link_ignored`). An "Ignore" action on each link in the dashboard widget mutes a URL or a whole host; ignored entries are skipped at collection time, so they cost no request and never surface. A "Stop ignoring" action and an "Ignored" section round out management from the same widget.
+- **"Scan now" button** in the dashboard widget. Schedules the check to run immediately (spawns cron; falls back to an inline run when `DISABLE_WP_CRON` is set) instead of waiting for the weekly event.
+- **"Could not verify" section** in the widget surfaces the `unverified` bucket for transparency without alarming.
+- **Per-link "Recheck"** re-tests a single URL on demand and moves it to the correct bucket.
+- **`timu_elc_broken_status_codes` filter** to tune which HTTP codes count as broken (defaults to `[404, 410]`).
+
+### Notes
+- The dashboard widget's JS and the shared admin CSS now enqueue admin-wide for `manage_options` users (the notice can appear on any screen). The asset is small and capability-gated.
+- All AJAX actions (dismiss, ignore, unignore, recheck, scan-now) are nonce-verified (`timu_elc_link_actions`) and capability-gated.
+
+## 1.6147 — 2026-05-27
+
+### Changed
+- Unified plugin versioning to the `x.Yddd` calendar-version scheme.
+- Confirmed compatibility with WordPress 7.0.
+
 ## 1.6143 — 2026-05-23
 
 ### Changed
