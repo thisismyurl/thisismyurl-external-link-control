@@ -371,6 +371,76 @@ class ELC_Link_Checker {
 		return $all_urls;
 	}
 
+	/**
+	 * Return the most recent scan's stored results in a flat, read-only shape.
+	 *
+	 * This is the single source of truth for "what did the last broken-link
+	 * scan find" — the dashboard widget, and the WP 7 Abilities API report,
+	 * both read through here so there is one shaping path. It performs no
+	 * outbound requests; it reads the stored RESULTS_OPTION and flattens the
+	 * `broken` / `unverified` URL maps into a list of link rows.
+	 *
+	 * Each row carries the URL, its bucket (broken|unverified), the last HTTP
+	 * status (0 when the request errored before a status was returned), the
+	 * checker's human-readable message, the post IDs the URL appears on, and a
+	 * derived `is_broken` boolean for callers that only care about the verdict.
+	 *
+	 * @since 1.6149
+	 *
+	 * @return array{
+	 *     checked_at: int,
+	 *     checked: int,
+	 *     broken_count: int,
+	 *     unverified_count: int,
+	 *     links: array<int,array{url:string,bucket:string,status_code:int,message:string,post_ids:int[],is_broken:bool}>
+	 * }
+	 */
+	public function get_results() {
+		$results = get_option( self::RESULTS_OPTION );
+		if ( ! is_array( $results ) ) {
+			return array(
+				'checked_at'       => 0,
+				'checked'          => 0,
+				'broken_count'     => 0,
+				'unverified_count' => 0,
+				'links'            => array(),
+			);
+		}
+
+		$links = array();
+
+		foreach ( array( 'broken', 'unverified' ) as $bucket ) {
+			if ( empty( $results[ $bucket ] ) || ! is_array( $results[ $bucket ] ) ) {
+				continue;
+			}
+			foreach ( $results[ $bucket ] as $url => $info ) {
+				$info       = is_array( $info ) ? $info : array();
+				$post_ids   = isset( $info['post_ids'] ) && is_array( $info['post_ids'] )
+					? array_values( array_map( 'intval', $info['post_ids'] ) )
+					: array();
+				$links[] = array(
+					'url'         => (string) $url,
+					'bucket'      => $bucket,
+					'status_code' => isset( $info['status'] ) ? (int) $info['status'] : 0,
+					'message'     => isset( $info['message'] ) ? (string) $info['message'] : '',
+					'post_ids'    => $post_ids,
+					'is_broken'   => ( 'broken' === $bucket ),
+				);
+			}
+		}
+
+		$broken_count     = isset( $results['broken'] ) && is_array( $results['broken'] ) ? count( $results['broken'] ) : 0;
+		$unverified_count = isset( $results['unverified'] ) && is_array( $results['unverified'] ) ? count( $results['unverified'] ) : 0;
+
+		return array(
+			'checked_at'       => isset( $results['checked_at'] ) ? (int) $results['checked_at'] : 0,
+			'checked'          => isset( $results['checked'] ) ? (int) $results['checked'] : 0,
+			'broken_count'     => $broken_count,
+			'unverified_count' => $unverified_count,
+			'links'            => $links,
+		);
+	}
+
 	/* ---------------------------------------------------------------------
 	 * The ignore list
 	 * ------------------------------------------------------------------- */

@@ -88,6 +88,9 @@ I review PRs thoughtfully and appreciate well-tested contributions. Contributing
 
 == Changelog ==
 
+= 1.6149 =
+* New: WordPress 7.0 Abilities API support. The plugin registers a read-only ability, `thisismyurl-external-link-control/scan-external-links`, that returns the most recent broken-link scan — every broken or unverifiable link, its HTTP status, and the posts it appears on — for AI agents and REST clients. It reads stored results only and never starts a new scan, so it is instant and makes no outbound requests. Filter by post ID or status. Requires the `manage_options` capability.
+
 = 1.6148 =
 * Fix: the broken-link admin notice now stays dismissed. Earlier versions shipped no JavaScript, so WordPress's dismiss "X" only hid the notice for that page load and never told the server — it reappeared on the next screen. Dismissing now records which links were dismissed; the notice only returns when a later scan finds a link that was not in the dismissed set.
 * Fix: far fewer false positives. A 401, 403, 405, 429, 451, or 999 response (login walls, bot protection, rate limits, servers that reject HEAD) is no longer reported as broken — these mean "the link exists, I just won't let an automated checker confirm it." Only 404, 410, and dead domains (a host that no longer resolves) count as broken. HEAD requests that fail now retry once with GET before any verdict, so HEAD-hostile servers stop showing up as broken.

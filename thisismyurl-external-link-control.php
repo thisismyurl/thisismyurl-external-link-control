@@ -25,6 +25,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-domain-rules.php'
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-link-processor.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-rest.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-link-checker.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/abilities.php';
 
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
     require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-cli.php';
