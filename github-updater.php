@@ -1,11 +1,10 @@
 <?php
 /**
- * Bundled GitHub release updater.
+ * Shared GitHub release updater.
  *
  * Polls a GitHub Release for a newer tag and feeds it into WordPress's
- * plugin-update transient. This is a per-plugin duplicated copy of the shared
- * hardened updater, namespaced uniquely so two co-installed plugins can't
- * collide.
+ * plugin-update transient. Bundled per-plugin under a prefixed namespace so
+ * two co-installed plugins can't collide on the class name.
  *
  * @package ThisIsMyURL\ELC
  */
@@ -244,8 +243,8 @@ class GitHubReleaseUpdater {
 	/**
 	 * Bootstrap a single updater instance per plugin basename.
 	 *
-	 * Mirrors the legacy timu_boot_github_release_updater() helper: idempotent
-	 * per plugin_file so a double-include can't register the filters twice.
+	 * Idempotent per plugin_file so a double-include can't register the filters
+	 * twice.
 	 *
 	 * @param array<string, string> $config Updater config (plugin_file, slug, repo).
 	 * @return void
