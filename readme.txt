@@ -22,6 +22,29 @@ The plugin currently supports:
 * Adding `rel="nofollow noopener noreferrer"` to external links
 * Leaving database content untouched by modifying links only during output
 
+**On activation, link filtering is OFF.** The master switch ships disabled so
+activating the plugin does not silently rewrite every external link on your
+site. Turn it on from Tools > Link Control when you are ready.
+
+= Outbound network activity (please read) =
+
+This plugin makes outbound network requests on your site's behalf. Two
+features reach the public internet, and you should know about them before you
+activate:
+
+* **Weekly broken-link crawler.** On activation the plugin schedules a weekly
+  WP-Cron job (`timu_elc_broken_link_check`) that scans your published post
+  content for external links and issues HTTP HEAD/GET requests to each one
+  (up to 200 per run) to find broken links. Results appear in a dashboard
+  widget. You can run it on demand with "Scan now", mute links with the ignore
+  list, and it never modifies your content. Deactivating the plugin unschedules
+  the job.
+* **REST endpoint `GET /wp-json/timu-elc/v1/inventory`.** A capability-gated
+  (`manage_options`) read-only endpoint that reports every external domain
+  found in your content with link counts. It runs no outbound requests of its
+  own — it reads your stored post content only — but it is part of the plugin's
+  surface and is documented here for transparency.
+
 == How It Works ==
 
 The plugin filters post content with `the_content` and updates matching external links during rendering.
@@ -87,6 +110,14 @@ I review PRs thoughtfully and appreciate well-tested contributions. Contributing
 2. The per-domain rules table, showing dofollow allowlist, target override, and rel="sponsored" controls for individual domains.
 
 == Changelog ==
+
+= 1.6150 =
+* Security: hardened the dashboard widget's "Recheck" action against server-side request forgery (SSRF). A recheck now only re-probes a URL the most recent scan already surfaced as broken or unverified, and refuses any host that resolves to a non-public address (loopback, link-local / cloud-metadata `169.254.169.254`, or RFC-1918 private space). The existing capability + nonce gate is unchanged.
+* Security: swapped the GitHub update checker to the hardened release updater — the API request now carries a User-Agent and a timeout, checks for an HTTP 200 before trusting the response, caches results for six hours, and scopes its post-install folder move to this plugin only.
+* Change: link filtering now ships OFF on activation. Activating the plugin no longer silently rewrites every external link sitewide; turn the master switch on from Tools > Link Control when you are ready. The new-tab / nofollow / UGC defaults are pre-set so the behaviour is in place the moment you enable filtering.
+* Fix: uninstall now removes the per-domain rules, broken-link scan results, and ignore-list options, and clears the weekly broken-link cron event, instead of leaving them behind.
+* Docs: the readme now discloses the weekly outbound broken-link crawler and the `/timu-elc/v1/inventory` REST endpoint so site owners know the plugin makes scheduled outbound network requests.
+* Performance: the broken-link scan now queries only post IDs (deferring content fetch and skipping meta/term cache priming and found-rows counting) instead of pulling full post objects while paging.
 
 = 1.6149 =
 * New: WordPress 7.0 Abilities API support. The plugin registers a read-only ability, `thisismyurl-external-link-control/scan-external-links`, that returns the most recent broken-link scan — every broken or unverifiable link, its HTTP status, and the posts it appears on — for AI agents and REST clients. It reads stored results only and never starts a new scan, so it is instant and makes no outbound requests. Filter by post ID or status. Requires the `manage_options` capability.
