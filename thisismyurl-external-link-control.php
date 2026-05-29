@@ -478,9 +478,10 @@ TIMU_ELC::instance();
 /**
  * GitHub release-updater integration.
  *
- * Wires the hardened TIMU_GitHub_Release_Updater (guarded after_install,
- * timeout + User-Agent on the API request, HTTP 200 check, and a 6-hour
- * transient cache). The legacy FWO_GitHub_Updater has been removed.
+ * Wires the bundled hardened updater (guarded after_install, timeout +
+ * User-Agent on the API request, HTTP 200 check, and a 6-hour transient
+ * cache). The updater body is a per-plugin duplicated copy namespaced under
+ * ThisIsMyURL\ELC so two co-installed plugins can't collide on the class name.
  */
 add_action( 'plugins_loaded', function () {
     $updater_path = plugin_dir_path( __FILE__ ) . 'github-updater.php';
@@ -488,11 +489,11 @@ add_action( 'plugins_loaded', function () {
         return;
     }
     require_once $updater_path;
-    if ( function_exists( 'timu_boot_github_release_updater' ) ) {
-        timu_boot_github_release_updater( array(
+    if ( class_exists( '\\ThisIsMyURL\\ELC\\GitHubReleaseUpdater' ) ) {
+        \ThisIsMyURL\ELC\GitHubReleaseUpdater::boot( array(
+            'plugin_file' => __FILE__,
             'slug'        => 'thisismyurl-external-link-control',
             'repo'        => 'thisismyurl/thisismyurl-external-link-control',
-            'plugin_file' => __FILE__,
         ) );
     }
 } );
