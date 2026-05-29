@@ -5,7 +5,7 @@ Tags: external links, nofollow, target blank, seo, link management
 Requires at least: 6.2
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.6148.2110
+Stable tag: 1.6149.0734
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
