@@ -3,7 +3,7 @@
  * Plugin Name:       This Is My URL - External Link Control
  * Plugin URI:        https://thisismyurl.com/external-link-control
  * Description:       Globally manage external link behavior, including nofollow and target attributes.
- * Version:           1.6148
+ * Version:           1.6148.2110
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            Christopher Ross
@@ -25,6 +25,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-domain-rules.php'
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-link-processor.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-rest.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-link-checker.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/abilities.php';
 
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
     require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-cli.php';
@@ -87,13 +88,23 @@ class TIMU_ELC {
     }
 
     /**
-     * Activate Plugin Defaults:
-     * Sets Master Switch, New Tab, and Nofollow to '1' by default.
+     * Activate Plugin Defaults.
+     *
+     * Least-surprise on activation: the master switch ships OFF, so activating
+     * the plugin does NOT silently rewrite every external link sitewide. The
+     * owner opts in from Tools > Link Control. The new-tab / nofollow / UGC
+     * toggles default ON only so that the moment the owner flips the master
+     * switch the sensible behaviour is already in place — none of them do
+     * anything while `enabled` is 0.
+     *
+     * The broken-link checker still schedules its weekly outbound crawler on
+     * activation (see ELC_Link_Checker::schedule_if_needed); that behaviour is
+     * disclosed in the readme Description.
      */
     public function activate_plugin_defaults() {
         if ( false === get_option( 'timu_elc_options' ) ) {
             add_option( 'timu_elc_options', array(
-                'enabled'      => 1,
+                'enabled'      => 0,
                 'new_tab'      => 1,
                 'nofollow'     => 1,
                 'comment_ugc'  => 1,
@@ -465,20 +476,23 @@ class TIMU_ELC {
 TIMU_ELC::instance();
 
 /**
- * GitHub Updater Integration.
+ * GitHub release-updater integration.
+ *
+ * Wires the hardened TIMU_GitHub_Release_Updater (guarded after_install,
+ * timeout + User-Agent on the API request, HTTP 200 check, and a 6-hour
+ * transient cache). The legacy FWO_GitHub_Updater has been removed.
  */
-add_action( 'plugins_loaded', function() {
-    $updater_path = plugin_dir_path( __FILE__ ) . 'updater.php';
-    if ( file_exists( $updater_path ) ) {
-        require_once $updater_path;
-        if ( class_exists( 'FWO_GitHub_Updater' ) ) {
-            new FWO_GitHub_Updater( array(
-                'slug'               => 'thisismyurl-external-link-control',
-                'proper_folder_name' => 'thisismyurl-external-link-control',
-                'api_url'            => 'https://api.github.com/repos/thisismyurl/thisismyurl-external-link-control/releases/latest',
-                'github_url'         => 'https://github.com/thisismyurl/thisismyurl-external-link-control',
-                'plugin_file'        => __FILE__,
-            ) );
-        }
+add_action( 'plugins_loaded', function () {
+    $updater_path = plugin_dir_path( __FILE__ ) . 'github-updater.php';
+    if ( ! file_exists( $updater_path ) ) {
+        return;
     }
-});
+    require_once $updater_path;
+    if ( function_exists( 'timu_boot_github_release_updater' ) ) {
+        timu_boot_github_release_updater( array(
+            'slug'        => 'thisismyurl-external-link-control',
+            'repo'        => 'thisismyurl/thisismyurl-external-link-control',
+            'plugin_file' => __FILE__,
+        ) );
+    }
+} );
