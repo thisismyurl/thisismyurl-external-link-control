@@ -3,7 +3,7 @@
  * Plugin Name:       This Is My URL - External Link Control
  * Plugin URI:        https://thisismyurl.com/external-link-control
  * Description:       Globally manage external link behavior, including nofollow and target attributes.
- * Version:           1.6149.0734
+ * Version:           1.6158.1440
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            Christopher Ross
@@ -136,7 +136,7 @@ class TIMU_ELC {
                 'timu-elc-admin',
                 plugins_url( 'assets/css/admin.css', __FILE__ ),
                 array(),
-                '1.6149.0734'
+                '1.6158.1440'
             );
         }
     }
