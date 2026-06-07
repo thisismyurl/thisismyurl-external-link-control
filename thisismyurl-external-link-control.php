@@ -136,7 +136,7 @@ class TIMU_ELC {
                 'timu-elc-admin',
                 plugins_url( 'assets/css/admin.css', __FILE__ ),
                 array(),
-                '1.6148'
+                '1.6149.0734'
             );
         }
     }
@@ -341,10 +341,13 @@ class TIMU_ELC {
                 <?php esc_html_e( 'External Link Control', 'thisismyurl-external-link-control' ); ?>
                 <span class="timu-elc-byline">
                     <?php
-                    printf(
-                        /* translators: %s: brand name "thisismyurl.com" rendered as a link. */
-                        esc_html__( 'by %s', 'thisismyurl-external-link-control' ),
-                        '<a href="https://thisismyurl.com/" target="_blank" rel="noopener noreferrer" class="timu-elc-byline-link">thisismyurl.com</a>'
+                    echo wp_kses(
+                        sprintf(
+                            /* translators: %s: brand name "thisismyurl.com" rendered as a link. */
+                            __( 'by %s', 'thisismyurl-external-link-control' ),
+                            '<a href="https://thisismyurl.com/" target="_blank" rel="noopener noreferrer" class="timu-elc-byline-link">thisismyurl.com</a>'
+                        ),
+                        array( 'a' => array( 'href' => array(), 'target' => array(), 'rel' => array(), 'class' => array() ) )
                     );
                     ?>
                 </span>
