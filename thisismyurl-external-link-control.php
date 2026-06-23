@@ -3,16 +3,15 @@
  * Plugin Name:       External Link Control by thisismyurl.com
  * Plugin URI:        https://thisismyurl.com/external-link-control
  * Description:       Globally manage external link behavior, including nofollow and target attributes.
- * Version:           0.6123
+ * Version:           0.6174.1642
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            Christopher Ross
  * Author URI:        https://thisismyurl.com/
  * Text Domain:       thisismyurl-external-link-control
  * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Donate link:       https://thisismyurl.com/donate/
- * GitHub Plugin URI: https://github.com/thisismyurl/thisismyurl-external-link-control
- * Primary Branch:    main
  * @package TIMU_ELC
  */
 
@@ -65,7 +64,7 @@ class TIMU_ELC {
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
         add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'add_plugin_action_links' ) );
 
-        new ELC_Link_Checker();
+        new TIMU_ELC_Link_Checker();
         $priority = (int) apply_filters( 'timu_elc_priority', 99 );
 
         add_filter( 'the_content', array( $this, 'modify_external_links' ), $priority );
@@ -83,7 +82,7 @@ class TIMU_ELC {
 
         // Set defaults upon activation.
         register_activation_hook( __FILE__, array( $this, 'activate_plugin_defaults' ) );
-        register_deactivation_hook( __FILE__, array( 'ELC_Link_Checker', 'deactivate' ) );
+        register_deactivation_hook( __FILE__, array( 'TIMU_ELC_Link_Checker', 'deactivate' ) );
     }
 
     /**
@@ -125,7 +124,7 @@ class TIMU_ELC {
                 'timu-elc-admin',
                 plugins_url( 'assets/css/admin.css', __FILE__ ),
                 array(),
-                '0.6123'
+                '0.6174.1642'
             );
         }
     }
@@ -182,6 +181,23 @@ class TIMU_ELC {
         $new_input['new_tab']     = isset( $input['new_tab'] ) ? 1 : 0;
         $new_input['nofollow']    = isset( $input['nofollow'] ) ? 1 : 0;
         $new_input['comment_ugc'] = isset( $input['comment_ugc'] ) ? 1 : 0;
+
+        // Same-tab domain exceptions: one domain per line, stored as a
+        // comma-separated string. Each entry is stripped with sanitize_text_field()
+        // and lowercased so matching is case-insensitive.
+        $raw_domains = isset( $input['target_same_tab_domains'] ) ? (string) $input['target_same_tab_domains'] : '';
+        $lines       = preg_split( '/[\r\n,]+/', $raw_domains );
+        $domains     = array();
+        if ( is_array( $lines ) ) {
+            foreach ( $lines as $line ) {
+                $clean = strtolower( sanitize_text_field( $line ) );
+                if ( '' !== $clean ) {
+                    $domains[] = $clean;
+                }
+            }
+        }
+        $new_input['target_same_tab_domains'] = implode( ',', array_unique( $domains ) );
+
         return $new_input;
     }
 
@@ -375,6 +391,28 @@ class TIMU_ELC {
                                                 <label for="timu_elc_comment_ugc"><?php esc_html_e( "Add rel='ugc' to external links inside comments (Google's recommended attribute for user-generated content).", 'thisismyurl-external-link-control' ); ?></label>
                                             </td>
                                         </tr>
+                                        <tr>
+                                            <th scope="row">
+                                                <label for="timu_elc_target_same_tab_domains"><?php esc_html_e( 'Same-Tab Domains', 'thisismyurl-external-link-control' ); ?></label>
+                                            </th>
+                                            <td>
+                                                <?php
+                                                // Convert the stored comma-separated string back to one-per-line for display.
+                                                $same_tab_raw    = isset( $options['target_same_tab_domains'] ) ? (string) $options['target_same_tab_domains'] : '';
+                                                $same_tab_lines  = '' !== $same_tab_raw ? implode( "\n", explode( ',', $same_tab_raw ) ) : '';
+                                                ?>
+                                                <textarea
+                                                    id="timu_elc_target_same_tab_domains"
+                                                    name="timu_elc_options[target_same_tab_domains]"
+                                                    rows="5"
+                                                    class="large-text"
+                                                    placeholder="docs.example.com"
+                                                ><?php echo esc_textarea( $same_tab_lines ); ?></textarea>
+                                                <p class="description">
+                                                    <?php esc_html_e( 'One domain per line (e.g. docs.example.com). Links to these domains will stay in the same tab even when Force New Tab is on. Rel attributes (nofollow, noopener, noreferrer) still apply.', 'thisismyurl-external-link-control' ); ?>
+                                                </p>
+                                            </td>
+                                        </tr>
                                     </table>
                                     <h2 class="title"><?php esc_html_e( 'Per-Domain Rules', 'thisismyurl-external-link-control' ); ?></h2>
                                     <p class="description">
@@ -464,21 +502,3 @@ class TIMU_ELC {
 
 TIMU_ELC::instance();
 
-/**
- * GitHub Updater Integration.
- */
-add_action( 'plugins_loaded', function() {
-    $updater_path = plugin_dir_path( __FILE__ ) . 'updater.php';
-    if ( file_exists( $updater_path ) ) {
-        require_once $updater_path;
-        if ( class_exists( 'FWO_GitHub_Updater' ) ) {
-            new FWO_GitHub_Updater( array(
-                'slug'               => 'thisismyurl-external-link-control',
-                'proper_folder_name' => 'thisismyurl-external-link-control',
-                'api_url'            => 'https://api.github.com/repos/thisismyurl/thisismyurl-external-link-control/releases/latest',
-                'github_url'         => 'https://github.com/thisismyurl/thisismyurl-external-link-control',
-                'plugin_file'        => __FILE__,
-            ) );
-        }
-    }
-});

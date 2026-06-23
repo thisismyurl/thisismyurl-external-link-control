@@ -2,6 +2,13 @@
 
 All notable changes to **External Link Control by thisismyurl.com** are recorded here. The plugin uses a `x.Yddd` Julian-day version scheme: `x` is the release class (`0` = pre-release, `1` = full), `Y` is the last digit of the year, and `ddd` is the day of year (001-366).
 
+## 0.6174.1642 — 2026-06-23
+
+### Added
+- Same-tab domain exceptions: a new "Same-Tab Domains" textarea in Tools > Link Control (one domain per line, e.g. `docs.example.com`). Domains listed here stay in the same tab even when the global Force New Tab setting is on. Rel attributes (nofollow, noopener, noreferrer) still apply to those domains — only `target="_blank"` is exempted. Stored as `target_same_tab_domains` in `timu_elc_options`; each entry is sanitized with `sanitize_text_field()` and lowercased.
+
+---
+
 ## 0.6123 — 2026-05-03
 
 Audit-driven overhaul. Closes 22 of the 30 issues filed under `audit-2026-05-03` on the same day; the 8 deferred items are listed at the bottom.

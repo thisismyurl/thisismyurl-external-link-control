@@ -13,9 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * ELC_Link_Checker manages the weekly broken-link HEAD-check cron event.
+ * TIMU_ELC_Link_Checker manages the weekly broken-link HEAD-check cron event.
  */
-class ELC_Link_Checker {
+class TIMU_ELC_Link_Checker {
 
 	/**
 	 * WP cron event hook name.
@@ -49,6 +49,7 @@ class ELC_Link_Checker {
 	 * Initialise hooks.
 	 */
 	public function __construct() {
+		add_filter( 'cron_schedules', array( $this, 'register_cron_schedules' ) );
 		add_action( self::CRON_HOOK, array( $this, 'run_check' ) );
 		add_action( 'admin_init', array( $this, 'schedule_if_needed' ) );
 		add_action( 'admin_notices', array( $this, 'maybe_render_admin_notice' ) );
@@ -57,11 +58,29 @@ class ELC_Link_Checker {
 	}
 
 	/**
+	 * Register a custom 'timu_elc_weekly' cron schedule.
+	 * WordPress does not include a built-in 'weekly' schedule, so we
+	 * register one to avoid wp_schedule_event() silently falling back.
+	 *
+	 * @param array $schedules Existing cron schedules.
+	 * @return array
+	 */
+	public function register_cron_schedules( $schedules ) {
+		if ( ! isset( $schedules['timu_elc_weekly'] ) ) {
+			$schedules['timu_elc_weekly'] = array(
+				'interval' => WEEK_IN_SECONDS,
+				'display'  => __( 'Once Weekly (External Link Control)', 'thisismyurl-external-link-control' ),
+			);
+		}
+		return $schedules;
+	}
+
+	/**
 	 * Schedule the weekly cron event if not already scheduled.
 	 */
 	public function schedule_if_needed() {
 		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
-			wp_schedule_event( time(), 'weekly', self::CRON_HOOK );
+			wp_schedule_event( time(), 'timu_elc_weekly', self::CRON_HOOK );
 		}
 	}
 

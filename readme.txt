@@ -2,9 +2,9 @@
 Contributors: thisismyurl
 Tags: external links, nofollow, target blank, seo, link management
 Requires at least: 6.2
-Tested up to: 6.9
+Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 0.6123
+Stable tag: 0.6174.1642
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,9 @@ I review PRs thoughtfully and appreciate well-tested contributions. Contributing
 
 == Changelog ==
 
+= 0.6174.1642 =
+* New: Same-Tab Domains — a textarea in Tools > Link Control where you list domains (one per line) that should stay in the same tab even when Force New Tab is on. Rel attributes still apply to those domains; only target="_blank" is exempted. Stored under target_same_tab_domains in timu_elc_options.
+
 = 0.6123 =
 * New: per-domain rules table — override nofollow, target, and sponsored on a per-domain basis. Dedicated "allowlist" column for rel=me / sameAs profile domains.
 * New: rel="ugc" automatically applied to external links inside comments (controlled by a new "Comment UGC" setting, on by default for fresh installs).
@@ -112,6 +115,9 @@ I review PRs thoughtfully and appreciate well-tested contributions. Contributing
 * Initial release
 
 == Upgrade Notice ==
+
+= 0.6174.1642 =
+Adds per-domain same-tab exceptions. No database changes — the new field is stored inside the existing timu_elc_options array.
 
 = 0.6123 =
 Major audit-driven overhaul. Adds per-domain rules, rel="ugc" on comments, rel="sponsored" support, FSE block coverage, render-time caching, accessibility text on forced new-tab links, and WP-CLI commands. Fixes a subdomain-misclassification bug in the internal-link detection, ensures `noopener noreferrer` always lands on `target="_blank"`, and stops mutating links inside `<code>` / `<pre>` / JSON-LD blocks. Minimum WP raised to 6.2.

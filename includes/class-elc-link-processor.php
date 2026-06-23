@@ -235,6 +235,32 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 		}
 
 		/**
+		 * Build the same-tab exception list from options.
+		 *
+		 * Returns a flat array of lowercase normalised hostnames that must
+		 * never receive target="_blank" even when the global new_tab toggle
+		 * is on. An empty array means no exceptions.
+		 *
+		 * @param array<string,mixed> $options Options snapshot.
+		 * @return array<string>
+		 */
+		private static function same_tab_hosts( $options ) {
+			$raw = isset( $options['target_same_tab_domains'] ) ? (string) $options['target_same_tab_domains'] : '';
+			if ( '' === $raw ) {
+				return array();
+			}
+			$parts = explode( ',', $raw );
+			$hosts = array();
+			foreach ( $parts as $part ) {
+				$clean = strtolower( trim( $part ) );
+				if ( '' !== $clean ) {
+					$hosts[] = $clean;
+				}
+			}
+			return $hosts;
+		}
+
+		/**
 		 * Walk anchor tags in HTML and rewrite each one. Uses
 		 * WP_HTML_Tag_Processor (WP 6.2+) when available so we get a
 		 * proper attribute parser instead of a regex; falls back to the
@@ -247,6 +273,7 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 		 */
 		private static function transform_anchors( $html, $options, $forced_rel ) {
 			if ( class_exists( 'WP_HTML_Tag_Processor' ) ) {
+				$same_tab = self::same_tab_hosts( $options );
 				$tags = new WP_HTML_Tag_Processor( $html );
 				while ( $tags->next_tag( 'a' ) ) {
 					$href = $tags->get_attribute( 'href' );
@@ -260,6 +287,11 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 					$href_host = TIMU_ELC_Host::host_for_href( $href );
 					$rule      = class_exists( 'TIMU_ELC_Domain_Rules' ) ? TIMU_ELC_Domain_Rules::match( $href_host ) : null;
 
+					// Check same-tab exception list before applying target="_blank".
+					// A match exempts this link from new-tab behaviour only; rel
+					// attributes (nofollow, noopener, noreferrer) still apply.
+					$in_same_tab_list = ! empty( $same_tab ) && in_array( $href_host, $same_tab, true );
+
 					$target  = $existing_target;
 					$we_set_blank = false;
 					if ( null === $existing_target || '' === $existing_target ) {
@@ -267,7 +299,7 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 							$target = $rule['target'];
 							$tags->set_attribute( 'target', $target );
 							$we_set_blank = ( '_blank' === $target );
-						} elseif ( ! empty( $options['new_tab'] ) ) {
+						} elseif ( ! empty( $options['new_tab'] ) && ! $in_same_tab_list ) {
 							$target = '_blank';
 							$tags->set_attribute( 'target', '_blank' );
 							$we_set_blank = true;
@@ -324,10 +356,11 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 			}
 
 			// Fallback for WP < 6.2.
+			$same_tab = self::same_tab_hosts( $options );
 			return preg_replace_callback(
 				'/<a\s[^>]*href=["\']([^"\']*)["\'][^>]*>/i',
-				static function ( $matches ) use ( $options, $forced_rel ) {
-					return self::rewrite_anchor_tag( $matches[0], $matches[1], $options, $forced_rel );
+				static function ( $matches ) use ( $options, $forced_rel, $same_tab ) {
+					return self::rewrite_anchor_tag( $matches[0], $matches[1], $options, $forced_rel, $same_tab );
 				},
 				$html
 			);
@@ -338,7 +371,8 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 		 *
 		 * Decisions are layered:
 		 *   - skip internal links entirely
-		 *   - if "force new tab" is on AND the link has no target, set _blank
+		 *   - if "force new tab" is on AND the link has no target AND the
+		 *     domain is not in the same-tab exception list, set _blank
 		 *   - if the resulting tag has target=_blank from any source
 		 *     (existing markup or our own injection), force `noopener noreferrer`
 		 *     onto rel — this is decoupled from the nofollow setting so the
@@ -352,22 +386,26 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 		 * @param string             $url        href value.
 		 * @param array<string,int>  $options    Plugin options snapshot.
 		 * @param array<string>      $forced_rel Tokens forced by caller (e.g. 'ugc' on comment_text).
+		 * @param array<string>      $same_tab   Lowercased hostnames exempt from target="_blank".
 		 * @return string Possibly-rewritten opening tag.
 		 */
-		private static function rewrite_anchor_tag( $link_html, $url, $options, $forced_rel = array() ) {
+		private static function rewrite_anchor_tag( $link_html, $url, $options, $forced_rel = array(), $same_tab = array() ) {
 			if ( ! TIMU_ELC_Host::is_external( $url ) ) {
 				return $link_html;
 			}
 
-			$href_host  = TIMU_ELC_Host::host_for_href( $url );
-			$rule       = class_exists( 'TIMU_ELC_Domain_Rules' ) ? TIMU_ELC_Domain_Rules::match( $href_host ) : null;
-			$has_target = (bool) preg_match( '/\btarget\s*=/i', $link_html );
+			$href_host        = TIMU_ELC_Host::host_for_href( $url );
+			$rule             = class_exists( 'TIMU_ELC_Domain_Rules' ) ? TIMU_ELC_Domain_Rules::match( $href_host ) : null;
+			$has_target       = (bool) preg_match( '/\btarget\s*=/i', $link_html );
+			$in_same_tab_list = ! empty( $same_tab ) && in_array( $href_host, $same_tab, true );
 
 			// Per-domain target override beats the global new-tab toggle.
+			// Same-tab exception list exempts from the global toggle only;
+			// an explicit per-domain rule still takes effect.
 			if ( $rule && '' !== $rule['target'] && ! $has_target ) {
 				$link_html  = str_replace( '<a ', '<a target="' . esc_attr( $rule['target'] ) . '" ', $link_html );
 				$has_target = true;
-			} elseif ( ! empty( $options['new_tab'] ) && ! $has_target ) {
+			} elseif ( ! empty( $options['new_tab'] ) && ! $has_target && ! $in_same_tab_list ) {
 				$link_html  = str_replace( '<a ', '<a target="_blank" ', $link_html );
 				$has_target = true;
 			}
