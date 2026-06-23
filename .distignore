@@ -17,9 +17,8 @@ CONTRIBUTING.md
 SECURITY.md
 PULL_REQUEST_TEMPLATE.md
 
-# GitHub-only updaters — never ship to .org.
+# GitHub-only updater — never ship to .org.
 github-updater.php
-updater.php
 
 # Tooling artefacts that occasionally land in the working tree.
 node_modules

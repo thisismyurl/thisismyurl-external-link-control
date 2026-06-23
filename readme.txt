@@ -1,10 +1,11 @@
-=== External Link Control ===
+=== This Is My URL - External Link Control ===
 Contributors: thisismyurl
+Donate link: https://github.com/sponsors/thisismyurl
 Tags: external links, nofollow, target blank, seo, link management
 Requires at least: 6.2
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 0.6174.1642
+Stable tag: 1.6158.1440
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,6 +21,29 @@ The plugin currently supports:
 * Opening external links in a new tab with `target="_blank"`
 * Adding `rel="nofollow noopener noreferrer"` to external links
 * Leaving database content untouched by modifying links only during output
+
+**On activation, link filtering is OFF.** The master switch ships disabled so
+activating the plugin does not silently rewrite every external link on your
+site. Turn it on from Tools > Link Control when you are ready.
+
+= Outbound network activity (please read) =
+
+This plugin makes outbound network requests on your site's behalf. Two
+features reach the public internet, and you should know about them before you
+activate:
+
+* **Weekly broken-link crawler.** On activation the plugin schedules a weekly
+  WP-Cron job (`timu_elc_broken_link_check`) that scans your published post
+  content for external links and issues HTTP HEAD/GET requests to each one
+  (up to 200 per run) to find broken links. Results appear in a dashboard
+  widget. You can run it on demand with "Scan now", mute links with the ignore
+  list, and it never modifies your content. Deactivating the plugin unschedules
+  the job.
+* **REST endpoint `GET /wp-json/timu-elc/v1/inventory`.** A capability-gated
+  (`manage_options`) read-only endpoint that reports every external domain
+  found in your content with link counts. It runs no outbound requests of its
+  own — it reads your stored post content only — but it is part of the plugin's
+  surface and is documented here for transparency.
 
 == How It Works ==
 
@@ -54,13 +78,15 @@ Yes. Disable the master switch or deactivate the plugin and the rendered output 
 
 = I want to support you =
 
-I'm building these tools because WordPress developers and site owners deserve straightforward, practical solutions. There's no tracking, no ads, and you don't need to pay to use these plugins.
+I build these tools because WordPress sites in the wild keep hitting the same problems, and a small, focused plugin is usually the right fix. They're free to use, with no tracking and no ads.
 
-If they're helpful, here are genuine ways to support the work:
+If one of them saves you time, here are the genuine ways to help:
 
-* **Sponsor this project:** Visit https://github.com/sponsors/thisismyurl if sponsorship fits your budget. Sponsorship helps, but it's always optional.
-* **Contribute code or ideas:** Opening a pull request, reporting an issue, or testing edge cases is just as valuable as sponsorship. Helping me improve these plugins is a great way to contribute.
-* **Share your experience:** A review on my [Google My Business profile](https://business.google.com/refer) or a follow on [WordPress.org](https://profiles.wordpress.org/thisismyurl/), [GitHub](https://github.com/thisismyurl), or [LinkedIn](https://linkedin.com/in/thisismyurl) helps others find this work.
+* **Sponsor the work:** [GitHub Sponsors](https://github.com/sponsors/thisismyurl) is the simplest way. Any amount helps, and none of it is expected.
+* **Contribute code or ideas:** A pull request, a bug report, or a tested edge case is worth as much as a donation. Helping me improve these plugins is a great way to contribute.
+* **Share it:** A note on [WordPress.org](https://profiles.wordpress.org/thisismyurl/), [GitHub](https://github.com/thisismyurl), or [LinkedIn](https://linkedin.com/in/thisismyurl) helps other people find work that might save them the same afternoon.
+
+This plugin is built and maintained by [This Is My URL](https://thisismyurl.com/), the WordPress development and technical SEO practice of Christopher Ross. I help teams build WordPress sites that stay secure, fast, and maintainable, and I write small, focused plugins like this one for the problems those sites keep running into.
 
 = I found a bug or have a feature idea =
 
@@ -87,8 +113,40 @@ I review PRs thoughtfully and appreciate well-tested contributions. Contributing
 
 == Changelog ==
 
-= 0.6174.1642 =
-* New: Same-Tab Domains — a textarea in Tools > Link Control where you list domains (one per line) that should stay in the same tab even when Force New Tab is on. Rel attributes still apply to those domains; only target="_blank" is exempted. Stored under target_same_tab_domains in timu_elc_options.
+= 1.6158 =
+* Fix: removed GitHub Plugin URI and Primary Branch headers from the main plugin file — these are development-side metadata for GitHub Updater tooling only and must not be present in a WordPress.org-distributed package.
+* Fix: renamed ELC_Link_Checker class to TIMU_ELC_Link_Checker for prefix uniqueness compliance.
+* Fix: registered a custom timu_elc_weekly cron schedule; wp_schedule_event no longer relies on the unregistered built-in weekly schedule.
+* Fix: Tested up to corrected to 6.7 (the highest actually-tested released version).
+* Fix: License URI header added to the main plugin file.
+
+= 1.6150 =
+* Security: hardened the dashboard widget's "Recheck" action against server-side request forgery (SSRF). A recheck now only re-probes a URL the most recent scan already surfaced as broken or unverified, and refuses any host that resolves to a non-public address (loopback, link-local / cloud-metadata `169.254.169.254`, or RFC-1918 private space). The existing capability + nonce gate is unchanged.
+* Security: swapped the GitHub update checker to the hardened release updater — the API request now carries a User-Agent and a timeout, checks for an HTTP 200 before trusting the response, caches results for six hours, and scopes its post-install folder move to this plugin only.
+* Change: link filtering now ships OFF on activation. Activating the plugin no longer silently rewrites every external link sitewide; turn the master switch on from Tools > Link Control when you are ready. The new-tab / nofollow / UGC defaults are pre-set so the behaviour is in place the moment you enable filtering.
+* Fix: uninstall now removes the per-domain rules, broken-link scan results, and ignore-list options, and clears the weekly broken-link cron event, instead of leaving them behind.
+* Docs: the readme now discloses the weekly outbound broken-link crawler and the `/timu-elc/v1/inventory` REST endpoint so site owners know the plugin makes scheduled outbound network requests.
+* Performance: the broken-link scan now queries only post IDs (deferring content fetch and skipping meta/term cache priming and found-rows counting) instead of pulling full post objects while paging.
+
+= 1.6149 =
+* New: WordPress 7.0 Abilities API support. The plugin registers a read-only ability, `thisismyurl-external-link-control/scan-external-links`, that returns the most recent broken-link scan — every broken or unverifiable link, its HTTP status, and the posts it appears on — for AI agents and REST clients. It reads stored results only and never starts a new scan, so it is instant and makes no outbound requests. Filter by post ID or status. Requires the `manage_options` capability.
+
+= 1.6148 =
+* Fix: the broken-link admin notice now stays dismissed. Earlier versions shipped no JavaScript, so WordPress's dismiss "X" only hid the notice for that page load and never told the server — it reappeared on the next screen. Dismissing now records which links were dismissed; the notice only returns when a later scan finds a link that was not in the dismissed set.
+* Fix: far fewer false positives. A 401, 403, 405, 429, 451, or 999 response (login walls, bot protection, rate limits, servers that reject HEAD) is no longer reported as broken — these mean "the link exists, I just won't let an automated checker confirm it." Only 404, 410, and dead domains (a host that no longer resolves) count as broken. HEAD requests that fail now retry once with GET before any verdict, so HEAD-hostile servers stop showing up as broken.
+* New: an ignore list. Use the "Ignore" button next to any link in the Broken Links dashboard widget to stop hearing about a URL or a whole host; manage it from the same widget ("Stop ignoring"). Ignored links are skipped during the scan, so they cost no request.
+* New: a "Scan now" button in the dashboard widget — run the check on demand instead of waiting for the weekly cron.
+* New: a "Could not verify" section in the widget lists links that answered but blocked the check, for transparency, without raising the notice.
+* New: per-link "Recheck" button to re-test a single URL immediately.
+* New: `timu_elc_broken_status_codes` filter to tune which HTTP status codes count as broken (defaults to 404 and 410).
+
+= 1.6147 =
+* Unified plugin versioning to the x.Yddd calendar-version scheme.
+* Confirmed compatibility with WordPress 6.7.
+
+= 1.6143 =
+* First full release (class 1). The 0.6xxx line was pre-release on the `x.Yddd` scheme.
+* Standardized the donation link to GitHub Sponsors.
 
 = 0.6123 =
 * New: per-domain rules table — override nofollow, target, and sponsored on a per-domain basis. Dedicated "allowlist" column for rel=me / sameAs profile domains.
@@ -116,8 +174,11 @@ I review PRs thoughtfully and appreciate well-tested contributions. Contributing
 
 == Upgrade Notice ==
 
-= 0.6174.1642 =
-Adds per-domain same-tab exceptions. No database changes — the new field is stored inside the existing timu_elc_options array.
+= 1.6158 =
+WP.org compliance fixes: GitHub Plugin URI header removed, class prefix corrected to TIMU_ELC_Link_Checker, custom weekly cron schedule registered, Tested up to corrected to 6.7.
+
+= 1.6148 =
+Broken-link checker overhaul: notice dismissals now stick, an ignore list lets you mute links you do not care about, a "Scan now" button runs the check on demand, and false positives (403/405/429 and HEAD-hostile servers like LinkedIn) are no longer reported as broken. Only genuine 404/410/dead-domain links raise the notice.
 
 = 0.6123 =
 Major audit-driven overhaul. Adds per-domain rules, rel="ugc" on comments, rel="sponsored" support, FSE block coverage, render-time caching, accessibility text on forced new-tab links, and WP-CLI commands. Fixes a subdomain-misclassification bug in the internal-link detection, ensures `noopener noreferrer` always lands on `target="_blank"`, and stops mutating links inside `<code>` / `<pre>` / JSON-LD blocks. Minimum WP raised to 6.2.

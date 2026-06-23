@@ -1,8 +1,10 @@
 <?php
 /**
- * Uninstaller for External Link Control by thisismyurl.com
+ * Uninstaller for External Link Control.
  *
- * Removes all plugin options and transients on uninstall.
+ * Removes every option the plugin creates, clears its scheduled cron
+ * event, and sweeps transients so an uninstall leaves no cruft in the
+ * database.
  *
  * @package TIMU_ELC
  */
@@ -12,17 +14,17 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-// Delete the primary plugin options.
-delete_option( 'timu_elc_options' );
+// Delete every option the plugin stores.
+delete_option( 'timu_elc_options' );              // Global toggles.
+delete_option( 'timu_elc_domain_rules' );         // Per-domain rules table.
+delete_option( 'timu_elc_broken_link_results' );  // Last broken-link scan.
+delete_option( 'timu_elc_broken_link_ignored' );  // Owner's ignore list.
 
-// Delete the per-domain rules table.
-delete_option( 'timu_elc_domain_rules' );
-
-// Delete the broken-link scan results.
-delete_option( 'timu_elc_broken_link_results' );
+// Clear the weekly broken-link crawler cron event (all scheduled instances).
+wp_clear_scheduled_hook( 'timu_elc_broken_link_check' );
 
 // Delete REST inventory transients (keyed by md5 of query params).
-// We cannot enumerate all md5 keys directly, so we use a global $wpdb sweep.
+// We cannot enumerate all md5 keys directly, so we use a $wpdb sweep.
 global $wpdb;
 $wpdb->query(
 	"DELETE FROM {$wpdb->options}

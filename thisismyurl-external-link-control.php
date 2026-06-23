@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name:       External Link Control by thisismyurl.com
+ * Plugin Name:       This Is My URL - External Link Control
  * Plugin URI:        https://thisismyurl.com/external-link-control
  * Description:       Globally manage external link behavior, including nofollow and target attributes.
- * Version:           0.6174.1642
+ * Version:           1.6158.1440
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            Christopher Ross
@@ -11,7 +11,7 @@
  * Text Domain:       thisismyurl-external-link-control
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Donate link:       https://thisismyurl.com/donate/
+ * Donate link:       https://github.com/sponsors/thisismyurl
  * @package TIMU_ELC
  */
 
@@ -24,6 +24,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-domain-rules.php'
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-link-processor.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-rest.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-link-checker.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/abilities.php';
 
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
     require_once plugin_dir_path( __FILE__ ) . 'includes/class-elc-cli.php';
@@ -86,13 +87,23 @@ class TIMU_ELC {
     }
 
     /**
-     * Activate Plugin Defaults:
-     * Sets Master Switch, New Tab, and Nofollow to '1' by default.
+     * Activate Plugin Defaults.
+     *
+     * Least-surprise on activation: the master switch ships OFF, so activating
+     * the plugin does NOT silently rewrite every external link sitewide. The
+     * owner opts in from Tools > Link Control. The new-tab / nofollow / UGC
+     * toggles default ON only so that the moment the owner flips the master
+     * switch the sensible behaviour is already in place — none of them do
+     * anything while `enabled` is 0.
+     *
+     * The broken-link checker still schedules its weekly outbound crawler on
+     * activation (see TIMU_ELC_Link_Checker::schedule_if_needed); that behaviour is
+     * disclosed in the readme Description.
      */
     public function activate_plugin_defaults() {
         if ( false === get_option( 'timu_elc_options' ) ) {
             add_option( 'timu_elc_options', array(
-                'enabled'      => 1,
+                'enabled'      => 0,
                 'new_tab'      => 1,
                 'nofollow'     => 1,
                 'comment_ugc'  => 1,
@@ -103,7 +114,7 @@ class TIMU_ELC {
     public function add_plugin_action_links( $links ) {
         $custom_links = array(
             '<a href="' . esc_url( admin_url( 'tools.php?page=thisismyurl-external-link-control' ) ) . '">' . esc_html__( 'Settings', 'thisismyurl-external-link-control' ) . '</a>',
-            '<a href="https://thisismyurl.com/donate/" target="_blank" rel="noopener noreferrer" class="timu-elc-donate-link">' . esc_html__( 'Donate', 'thisismyurl-external-link-control' ) . '</a>',
+            '<a href="' . esc_url( 'https://github.com/sponsors/thisismyurl' ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Sponsor', 'thisismyurl-external-link-control' ) . '</a>',
         );
         return array_merge( $custom_links, $links );
     }
@@ -124,7 +135,7 @@ class TIMU_ELC {
                 'timu-elc-admin',
                 plugins_url( 'assets/css/admin.css', __FILE__ ),
                 array(),
-                '0.6174.1642'
+                '1.6158.1440'
             );
         }
     }
@@ -346,10 +357,13 @@ class TIMU_ELC {
                 <?php esc_html_e( 'External Link Control', 'thisismyurl-external-link-control' ); ?>
                 <span class="timu-elc-byline">
                     <?php
-                    printf(
-                        /* translators: %s: brand name "thisismyurl.com" rendered as a link. */
-                        esc_html__( 'by %s', 'thisismyurl-external-link-control' ),
-                        '<a href="https://thisismyurl.com/" target="_blank" rel="noopener noreferrer" class="timu-elc-byline-link">thisismyurl.com</a>'
+                    echo wp_kses(
+                        sprintf(
+                            /* translators: %s: brand name "thisismyurl.com" rendered as a link. */
+                            __( 'by %s', 'thisismyurl-external-link-control' ),
+                            '<a href="https://thisismyurl.com/" target="_blank" rel="noopener noreferrer" class="timu-elc-byline-link">thisismyurl.com</a>'
+                        ),
+                        array( 'a' => array( 'href' => array(), 'target' => array(), 'rel' => array(), 'class' => array() ) )
                     );
                     ?>
                 </span>
@@ -489,7 +503,7 @@ class TIMU_ELC {
                             <div class="inside">
                                 <p><?php esc_html_e( 'This plugin modifies links dynamically during page render, keeping your database clean.', 'thisismyurl-external-link-control' ); ?></p>
                                 <hr />
-                                <p><a href="https://thisismyurl.com/donate/" class="button button-secondary" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Donate to Development', 'thisismyurl-external-link-control' ); ?></a></p>
+                                <p><a href="<?php echo esc_url( 'https://github.com/sponsors/thisismyurl' ); ?>" class="button button-secondary" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Sponsor development', 'thisismyurl-external-link-control' ); ?></a></p>
                             </div>
                         </div>
                     </div>
@@ -502,3 +516,25 @@ class TIMU_ELC {
 
 TIMU_ELC::instance();
 
+/**
+ * GitHub release-updater integration.
+ *
+ * Wires the bundled hardened updater (guarded after_install, timeout +
+ * User-Agent on the API request, HTTP 200 check, and a 6-hour transient
+ * cache). The updater body is a per-plugin duplicated copy namespaced under
+ * ThisIsMyURL\ELC so two co-installed plugins can't collide on the class name.
+ */
+add_action( 'plugins_loaded', function () {
+    $updater_path = plugin_dir_path( __FILE__ ) . 'github-updater.php';
+    if ( ! file_exists( $updater_path ) ) {
+        return;
+    }
+    require_once $updater_path;
+    if ( class_exists( '\\ThisIsMyURL\\ELC\\GitHubReleaseUpdater' ) ) {
+        \ThisIsMyURL\ELC\GitHubReleaseUpdater::boot( array(
+            'plugin_file' => __FILE__,
+            'slug'        => 'thisismyurl-external-link-control',
+            'repo'        => 'thisismyurl/thisismyurl-external-link-control',
+        ) );
+    }
+} );
