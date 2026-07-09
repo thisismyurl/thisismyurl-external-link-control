@@ -2,6 +2,20 @@
 
 All notable changes to **External Link Control by thisismyurl.com** are recorded here. The plugin uses a `x.Yddd` Julian-day version scheme: `x` is the release class (`0` = pre-release, `1` = full), `Y` is the last digit of the year, and `ddd` is the day of year (001-366).
 
+## [1.6190.1000] — 2026-07-09
+
+### Added
+- **noreferrer toggle** — Strip Referrer on new-tab links is now a user-controlled setting (previously hardcoded ON). Turn it off when you need affiliate tracking, partner analytics, or editorial-credit referral headers to reach the destination. `noopener` is always applied regardless.
+- **Link Inventory panel** — new postbox on the settings page lists every external domain found in published content, the number of links pointing to it, and whether a domain rule already covers it. Backed by the existing REST endpoint (`/timu-elc/v1/inventory`) with a 1-hour transient cache.
+- **Domain rules Remove button** — each row in the rules table now has a Remove button; an Add Row button below the table adds blank rows without a page reload.
+- **Broken-link sidebar status** — the settings sidebar now shows how many broken links were found on the last scan and when that scan ran (or prompts you to run one for the first time).
+- **Sponsored/nofollow guidance** — an inline note explains that Sponsored already implies nofollow and the two should not be combined with Allowlist.
+- **WP-CLI reference sidebar** — inline command examples for the scanner, dismiss, and reset commands alongside the quick-links.
+
+### Improved
+- `readme.txt` rewritten to WP.org plugin directory submission quality: structured Description, 13-item FAQ, Screenshots stub, Changelog, and Upgrade Notice sections.
+- Admin stylesheet split out of inline HTML into `assets/css/admin.css`; admin JS extended with domain-rules and inventory behaviour.
+
 ## 1.6158 — 2026-06-23
 
 WordPress.org directory submission compliance pass. All 5 gate-blocking issues resolved.
