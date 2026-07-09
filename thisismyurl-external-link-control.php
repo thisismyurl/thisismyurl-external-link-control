@@ -3,7 +3,7 @@
  * Plugin Name:       This Is My URL - External Link Control
  * Plugin URI:        https://thisismyurl.com/external-link-control
  * Description:       Globally manage external link behavior, including nofollow and target attributes.
- * Version:           1.6158.1440
+ * Version:           1.6190.1000
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            Christopher Ross
@@ -66,6 +66,7 @@ class TIMU_ELC {
         add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'add_plugin_action_links' ) );
 
         new TIMU_ELC_Link_Checker();
+        add_action( 'wp_ajax_timu_elc_inventory', array( $this, 'ajax_inventory' ) );
         $priority = (int) apply_filters( 'timu_elc_priority', 99 );
 
         add_filter( 'the_content', array( $this, 'modify_external_links' ), $priority );
@@ -105,6 +106,7 @@ class TIMU_ELC {
             add_option( 'timu_elc_options', array(
                 'enabled'      => 0,
                 'new_tab'      => 1,
+                'noreferrer'   => 1,
                 'nofollow'     => 1,
                 'comment_ugc'  => 1,
             ), '', 'no' );
@@ -135,7 +137,38 @@ class TIMU_ELC {
                 'timu-elc-admin',
                 plugins_url( 'assets/css/admin.css', __FILE__ ),
                 array(),
-                '1.6158.1440'
+                '1.6190.1000'
+            );
+        }
+
+        if ( '' !== $this->admin_hook && $hook === $this->admin_hook ) {
+            wp_enqueue_script(
+                'timu-elc-admin',
+                plugins_url( 'assets/js/admin.js', __FILE__ ),
+                array(),
+                '1.6190.1000',
+                true
+            );
+            $rules         = TIMU_ELC_Domain_Rules::all();
+            $ruled_domains = array_values( array_filter( array_column( $rules, 'domain' ) ) );
+            wp_localize_script(
+                'timu-elc-admin',
+                'timuElcAdminPage',
+                array(
+                    'inventoryUrl'  => rest_url( 'timu-elc/v1/inventory' ),
+                    'restNonce'     => wp_create_nonce( 'wp_rest' ),
+                    'ruledDomains'  => $ruled_domains,
+                    'i18n'          => array(
+                        'loading'    => __( 'Loading…', 'thisismyurl-external-link-control' ),
+                        'loadError'  => __( 'Could not load inventory. Try again after refreshing.', 'thisismyurl-external-link-control' ),
+                        'noLinks'    => __( 'No external links found in published content.', 'thisismyurl-external-link-control' ),
+                        'hasRule'    => __( 'Has rule', 'thisismyurl-external-link-control' ),
+                        'noRule'     => __( '—', 'thisismyurl-external-link-control' ),
+                        'remove'     => __( 'Remove', 'thisismyurl-external-link-control' ),
+                        'inherit'    => __( 'Inherit', 'thisismyurl-external-link-control' ),
+                        'domain'     => __( 'Domain', 'thisismyurl-external-link-control' ),
+                    ),
+                )
             );
         }
     }
@@ -190,6 +223,7 @@ class TIMU_ELC {
         $new_input = array();
         $new_input['enabled']     = isset( $input['enabled'] ) ? 1 : 0;
         $new_input['new_tab']     = isset( $input['new_tab'] ) ? 1 : 0;
+        $new_input['noreferrer']  = isset( $input['noreferrer'] ) ? 1 : 0;
         $new_input['nofollow']    = isset( $input['nofollow'] ) ? 1 : 0;
         $new_input['comment_ugc'] = isset( $input['comment_ugc'] ) ? 1 : 0;
 
@@ -350,7 +384,10 @@ class TIMU_ELC {
             return;
         }
 
-        $options = get_option( 'timu_elc_options' );
+        $options      = get_option( 'timu_elc_options', array() );
+        $link_results = get_option( TIMU_ELC_Link_Checker::RESULTS_OPTION, array() );
+        $broken_count = ! empty( $link_results['broken'] ) ? count( $link_results['broken'] ) : 0;
+        $checked_at   = ! empty( $link_results['checked_at'] ) ? (int) $link_results['checked_at'] : 0;
         ?>
         <div class="wrap">
             <h1>
@@ -368,10 +405,12 @@ class TIMU_ELC {
                     ?>
                 </span>
             </h1>
-            
+
             <div id="poststuff">
                 <div id="post-body" class="metabox-holder columns-2">
                     <div id="post-body-content">
+
+                        <!-- Global settings form -->
                         <div class="postbox">
                             <div class="inside">
                                 <form method="post" action="options.php">
@@ -385,52 +424,61 @@ class TIMU_ELC {
                                             </td>
                                         </tr>
                                         <tr>
-                                            <th scope="row"><?php esc_html_e( 'Force New Tab', 'thisismyurl-external-link-control' ); ?></th>
+                                            <th scope="row"><?php esc_html_e( 'Open in New Tab', 'thisismyurl-external-link-control' ); ?></th>
                                             <td>
                                                 <input type="checkbox" id="timu_elc_new_tab" name="timu_elc_options[new_tab]" value="1" <?php checked( 1, isset( $options['new_tab'] ) ? $options['new_tab'] : 0 ); ?> />
-                                                <label for="timu_elc_new_tab"><?php esc_html_e( 'Open external links in a new window.', 'thisismyurl-external-link-control' ); ?></label>
+                                                <label for="timu_elc_new_tab"><?php esc_html_e( 'Open external links in a new tab (adds target="_blank").', 'thisismyurl-external-link-control' ); ?></label>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th scope="row"><?php esc_html_e( 'Strip Referrer', 'thisismyurl-external-link-control' ); ?></th>
+                                            <td>
+                                                <input type="checkbox" id="timu_elc_noreferrer" name="timu_elc_options[noreferrer]" value="1" <?php checked( 1, isset( $options['noreferrer'] ) ? $options['noreferrer'] : 1 ); ?> />
+                                                <label for="timu_elc_noreferrer"><?php esc_html_e( 'Add rel="noreferrer" on new-tab links.', 'thisismyurl-external-link-control' ); ?></label>
+                                                <p class="description"><?php esc_html_e( 'Prevents the destination site from seeing your site as the referrer. Turn this off if you need referral tracking to work — affiliate dashboards, partner analytics, and editorial credit links all depend on the Referer header being present. noopener is always added regardless of this setting.', 'thisismyurl-external-link-control' ); ?></p>
                                             </td>
                                         </tr>
                                         <tr>
                                             <th scope="row"><?php esc_html_e( 'SEO Nofollow', 'thisismyurl-external-link-control' ); ?></th>
                                             <td>
                                                 <input type="checkbox" id="timu_elc_nofollow" name="timu_elc_options[nofollow]" value="1" <?php checked( 1, isset( $options['nofollow'] ) ? $options['nofollow'] : 0 ); ?> />
-                                                <label for="timu_elc_nofollow"><?php esc_html_e( "Protect link equity with 'nofollow'.", 'thisismyurl-external-link-control' ); ?></label>
+                                                <label for="timu_elc_nofollow"><?php esc_html_e( "Add rel="nofollow" to external links.", 'thisismyurl-external-link-control' ); ?></label>
                                             </td>
                                         </tr>
                                         <tr>
                                             <th scope="row"><?php esc_html_e( 'Comment UGC', 'thisismyurl-external-link-control' ); ?></th>
                                             <td>
                                                 <input type="checkbox" id="timu_elc_comment_ugc" name="timu_elc_options[comment_ugc]" value="1" <?php checked( 1, isset( $options['comment_ugc'] ) ? $options['comment_ugc'] : 0 ); ?> />
-                                                <label for="timu_elc_comment_ugc"><?php esc_html_e( "Add rel='ugc' to external links inside comments (Google's recommended attribute for user-generated content).", 'thisismyurl-external-link-control' ); ?></label>
+                                                <label for="timu_elc_comment_ugc"><?php esc_html_e( "Add rel="ugc" to external links in comments (Google's recommended attribute for user-generated content).", 'thisismyurl-external-link-control' ); ?></label>
                                             </td>
                                         </tr>
                                         <tr>
                                             <th scope="row">
-                                                <label for="timu_elc_target_same_tab_domains"><?php esc_html_e( 'Same-Tab Domains', 'thisismyurl-external-link-control' ); ?></label>
+                                                <label for="timu_elc_target_same_tab_domains"><?php esc_html_e( 'Same-Tab Exceptions', 'thisismyurl-external-link-control' ); ?></label>
                                             </th>
                                             <td>
                                                 <?php
-                                                // Convert the stored comma-separated string back to one-per-line for display.
-                                                $same_tab_raw    = isset( $options['target_same_tab_domains'] ) ? (string) $options['target_same_tab_domains'] : '';
-                                                $same_tab_lines  = '' !== $same_tab_raw ? implode( "\n", explode( ',', $same_tab_raw ) ) : '';
+                                                $same_tab_raw   = isset( $options['target_same_tab_domains'] ) ? (string) $options['target_same_tab_domains'] : '';
+                                                $same_tab_lines = '' !== $same_tab_raw ? implode( "
+", explode( ',', $same_tab_raw ) ) : '';
                                                 ?>
                                                 <textarea
                                                     id="timu_elc_target_same_tab_domains"
                                                     name="timu_elc_options[target_same_tab_domains]"
-                                                    rows="5"
+                                                    rows="4"
                                                     class="large-text"
                                                     placeholder="docs.example.com"
                                                 ><?php echo esc_textarea( $same_tab_lines ); ?></textarea>
                                                 <p class="description">
-                                                    <?php esc_html_e( 'One domain per line (e.g. docs.example.com). Links to these domains will stay in the same tab even when Force New Tab is on. Rel attributes (nofollow, noopener, noreferrer) still apply.', 'thisismyurl-external-link-control' ); ?>
+                                                    <?php esc_html_e( 'One domain per line. Links to these domains stay in the same tab even when Open in New Tab is on. Rel attributes still apply.', 'thisismyurl-external-link-control' ); ?>
                                                 </p>
                                             </td>
                                         </tr>
                                     </table>
+
                                     <h2 class="title"><?php esc_html_e( 'Per-Domain Rules', 'thisismyurl-external-link-control' ); ?></h2>
                                     <p class="description">
-                                        <?php esc_html_e( 'Override the global behaviour for specific domains. Use this for rel="me" / sameAs profiles you want left dofollow, paid placements that should always carry rel="sponsored", or first-party properties you want to open in the same tab.', 'thisismyurl-external-link-control' ); ?>
+                                        <?php esc_html_e( 'Override global behaviour for specific domains. Use this for rel="me" profiles you want left dofollow, paid placements that should carry rel="sponsored", or partner sites you want to open in the same tab.', 'thisismyurl-external-link-control' ); ?>
                                     </p>
                                     <table class="widefat striped timu-elc-domain-rules">
                                         <thead>
@@ -439,13 +487,13 @@ class TIMU_ELC {
                                                 <th scope="col"><?php esc_html_e( 'Dofollow', 'thisismyurl-external-link-control' ); ?></th>
                                                 <th scope="col"><?php esc_html_e( 'Target', 'thisismyurl-external-link-control' ); ?></th>
                                                 <th scope="col"><?php esc_html_e( 'Sponsored', 'thisismyurl-external-link-control' ); ?></th>
-                                                <th scope="col"><?php esc_html_e( 'Allowlist (rel=me / sameAs)', 'thisismyurl-external-link-control' ); ?></th>
+                                                <th scope="col"><?php esc_html_e( 'Allowlist', 'thisismyurl-external-link-control' ); ?></th>
+                                                <th scope="col"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'thisismyurl-external-link-control' ); ?></span></th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <?php
-                                            $rules = TIMU_ELC_Domain_Rules::all();
-                                            // Always render at least three blank rows so the form is usable on a fresh install.
+                                            $rules      = TIMU_ELC_Domain_Rules::all();
                                             $blank_rows = max( 0, 3 - count( $rules ) );
                                             for ( $i = 0; $i < $blank_rows; $i++ ) {
                                                 $rules[] = array(
@@ -484,57 +532,173 @@ class TIMU_ELC {
                                                         <label class="screen-reader-text" for="<?php echo esc_attr( 'timu_elc_dr_allowlist_' . $i ); ?>"><?php esc_html_e( 'Allowlist', 'thisismyurl-external-link-control' ); ?></label>
                                                         <input type="checkbox" id="<?php echo esc_attr( 'timu_elc_dr_allowlist_' . $i ); ?>" name="<?php echo esc_attr( $name_prefix . '[allowlist]' ); ?>" value="1" <?php checked( true, ! empty( $rule['allowlist'] ) ); ?> />
                                                     </td>
+                                                    <td>
+                                                        <button type="button" class="button-link timu-elc-remove-row" aria-label="<?php esc_attr_e( 'Remove this rule', 'thisismyurl-external-link-control' ); ?>"><?php esc_html_e( 'Remove', 'thisismyurl-external-link-control' ); ?></button>
+                                                    </td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
                                     </table>
-                                    <p class="description">
-                                        <?php esc_html_e( 'Tip: leave a row\'s domain blank to delete it on save. Subdomains inherit the parent rule (a rule on linkedin.com applies to www.linkedin.com automatically).', 'thisismyurl-external-link-control' ); ?>
+
+                                    <!-- Row template: cloned by JS for "Add row". Not submitted (inputs disabled). -->
+                                    <template id="timu-elc-row-template">
+                                        <tr>
+                                            <td>
+                                                <label class="screen-reader-text" for="timu_elc_dr_domain___IDX__"><?php esc_html_e( 'Domain', 'thisismyurl-external-link-control' ); ?></label>
+                                                <input type="text" id="timu_elc_dr_domain___IDX__" name="timu_elc_domain_rules[__IDX__][domain]" value="" placeholder="example.com" class="regular-text" />
+                                            </td>
+                                            <td>
+                                                <label class="screen-reader-text" for="timu_elc_dr_dofollow___IDX__"><?php esc_html_e( 'Dofollow', 'thisismyurl-external-link-control' ); ?></label>
+                                                <input type="checkbox" id="timu_elc_dr_dofollow___IDX__" name="timu_elc_domain_rules[__IDX__][dofollow]" value="1" />
+                                            </td>
+                                            <td>
+                                                <label class="screen-reader-text" for="timu_elc_dr_target___IDX__"><?php esc_html_e( 'Target', 'thisismyurl-external-link-control' ); ?></label>
+                                                <select id="timu_elc_dr_target___IDX__" name="timu_elc_domain_rules[__IDX__][target]">
+                                                    <option value=""><?php esc_html_e( 'Inherit', 'thisismyurl-external-link-control' ); ?></option>
+                                                    <option value="_blank">_blank</option>
+                                                    <option value="_self">_self</option>
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <label class="screen-reader-text" for="timu_elc_dr_sponsored___IDX__"><?php esc_html_e( 'Sponsored', 'thisismyurl-external-link-control' ); ?></label>
+                                                <input type="checkbox" id="timu_elc_dr_sponsored___IDX__" name="timu_elc_domain_rules[__IDX__][sponsored]" value="1" />
+                                            </td>
+                                            <td>
+                                                <label class="screen-reader-text" for="timu_elc_dr_allowlist___IDX__"><?php esc_html_e( 'Allowlist', 'thisismyurl-external-link-control' ); ?></label>
+                                                <input type="checkbox" id="timu_elc_dr_allowlist___IDX__" name="timu_elc_domain_rules[__IDX__][allowlist]" value="1" />
+                                            </td>
+                                            <td>
+                                                <button type="button" class="button-link timu-elc-remove-row" aria-label="<?php esc_attr_e( 'Remove this rule', 'thisismyurl-external-link-control' ); ?>"><?php esc_html_e( 'Remove', 'thisismyurl-external-link-control' ); ?></button>
+                                            </td>
+                                        </tr>
+                                    </template>
+
+                                    <p class="timu-elc-domain-rules-meta description">
+                                        <?php esc_html_e( 'Subdomains inherit the parent rule — a rule on linkedin.com applies to www.linkedin.com automatically. A more-specific rule (jobs.linkedin.com) takes precedence.', 'thisismyurl-external-link-control' ); ?>
+                                        <br><strong><?php esc_html_e( 'Sponsored:', 'thisismyurl-external-link-control' ); ?></strong>
+                                        <?php esc_html_e( 'Sets rel="sponsored" for paid placements. Google treats sponsored as equivalent to nofollow — no need to check both. Do not combine with Allowlist, which suppresses rel attributes entirely.', 'thisismyurl-external-link-control' ); ?>
                                     </p>
-                                    <?php submit_button( __( 'Update Link Settings', 'thisismyurl-external-link-control' ) ); ?>
+
+                                    <p>
+                                        <button type="button" id="timu-elc-add-row" class="button"><?php esc_html_e( '+ Add row', 'thisismyurl-external-link-control' ); ?></button>
+                                    </p>
+
+                                    <?php submit_button( __( 'Save Link Settings', 'thisismyurl-external-link-control' ) ); ?>
                                 </form>
                             </div>
                         </div>
-                    </div>
+
+                        <!-- Link inventory panel -->
+                        <div class="postbox">
+                            <h2 class="hndle"><span><?php esc_html_e( 'Link Inventory', 'thisismyurl-external-link-control' ); ?></span></h2>
+                            <div class="inside">
+                                <p><?php esc_html_e( 'All external domains found in your published content, sorted by link count. Use this to spot domains that should have a per-domain rule configured.', 'thisismyurl-external-link-control' ); ?></p>
+                                <p>
+                                    <button type="button" id="timu-elc-load-inventory" class="button"><?php esc_html_e( 'Load inventory', 'thisismyurl-external-link-control' ); ?></button>
+                                    <span class="timu-elc-inventory-status"></span>
+                                </p>
+                                <div id="timu-elc-inventory-results" style="display:none;margin-top:1em"></div>
+                            </div>
+                        </div>
+
+                    </div><!-- #post-body-content -->
 
                     <div id="postbox-container-1" class="postbox-container">
+
+                        <!-- Broken-link status -->
+                        <div class="postbox">
+                            <h2 class="hndle"><span><?php esc_html_e( 'Link Checker', 'thisismyurl-external-link-control' ); ?></span></h2>
+                            <div class="inside">
+                                <?php if ( $broken_count > 0 ) : ?>
+                                    <p class="timu-elc-status-broken">
+                                        <?php
+                                        echo wp_kses(
+                                            sprintf(
+                                                /* translators: %d: number of broken links found. */
+                                                _n(
+                                                    '<strong>%d broken link</strong> found.',
+                                                    '<strong>%d broken links</strong> found.',
+                                                    $broken_count,
+                                                    'thisismyurl-external-link-control'
+                                                ),
+                                                $broken_count
+                                            ),
+                                            array( 'strong' => array() )
+                                        );
+                                        ?>
+                                        &nbsp;<a href="<?php echo esc_url( admin_url( 'index.php' ) ); ?>"><?php esc_html_e( 'View on Dashboard', 'thisismyurl-external-link-control' ); ?></a>
+                                    </p>
+                                <?php elseif ( $checked_at > 0 ) : ?>
+                                    <p class="timu-elc-status-ok"><?php esc_html_e( 'No broken links found.', 'thisismyurl-external-link-control' ); ?></p>
+                                <?php else : ?>
+                                    <p class="description"><?php esc_html_e( 'No scan run yet. The weekly scan runs automatically, or you can trigger it from the Dashboard widget.', 'thisismyurl-external-link-control' ); ?></p>
+                                <?php endif; ?>
+                                <?php if ( $checked_at > 0 ) : ?>
+                                    <p class="description">
+                                        <?php
+                                        echo esc_html(
+                                            sprintf(
+                                                /* translators: %s: human-readable time difference. */
+                                                __( 'Last scan: %s ago.', 'thisismyurl-external-link-control' ),
+                                                human_time_diff( $checked_at )
+                                            )
+                                        );
+                                        ?>
+                                    </p>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <!-- Documentation -->
                         <div class="postbox">
                             <h2 class="hndle"><span><?php esc_html_e( 'Documentation', 'thisismyurl-external-link-control' ); ?></span></h2>
                             <div class="inside">
-                                <p><?php esc_html_e( 'This plugin modifies links dynamically during page render, keeping your database clean.', 'thisismyurl-external-link-control' ); ?></p>
+                                <p><?php esc_html_e( 'Links are modified at render time. Your stored post content is never rewritten.', 'thisismyurl-external-link-control' ); ?></p>
                                 <hr />
-                                <p><a href="<?php echo esc_url( 'https://github.com/sponsors/thisismyurl' ); ?>" class="button button-secondary" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Sponsor development', 'thisismyurl-external-link-control' ); ?></a></p>
+                                <p><strong><?php esc_html_e( 'WP-CLI', 'thisismyurl-external-link-control' ); ?></strong></p>
+                                <p>
+                                    <code>wp elc audit</code> &mdash; <?php esc_html_e( 'list all external domains', 'thisismyurl-external-link-control' ); ?><br>
+                                    <code>wp elc rewrite --post_id=123 --dry-run</code> &mdash; <?php esc_html_e( 'preview what would change on a post', 'thisismyurl-external-link-control' ); ?>
+                                </p>
+                                <hr />
+                                <p><a href="<?php echo esc_url( 'https://github.com/thisismyurl/thisismyurl-external-link-control' ); ?>" target="_blank" rel="noopener noreferrer" class="button button-secondary"><?php esc_html_e( 'GitHub', 'thisismyurl-external-link-control' ); ?></a>
+                                <a href="<?php echo esc_url( 'https://github.com/sponsors/thisismyurl' ); ?>" target="_blank" rel="noopener noreferrer" class="button button-secondary"><?php esc_html_e( 'Sponsor', 'thisismyurl-external-link-control' ); ?></a></p>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+
+                    </div><!-- #postbox-container-1 -->
+                </div><!-- #post-body -->
+            </div><!-- #poststuff -->
+        </div><!-- .wrap -->
         <?php
+    }
+
+    /**
+     * AJAX handler: return the link inventory as a JSON response.
+     *
+     * Delegates to the registered REST route so the transient cache is
+     * shared between REST and AJAX callers.
+     *
+     * @return void
+     */
+    public function ajax_inventory() {
+        check_ajax_referer( 'wp_rest', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( null, 403 );
+        }
+
+        $request = new WP_REST_Request( 'GET', '/timu-elc/v1/inventory' );
+        $request->set_param( 'orderby', 'count' );
+        $request->set_param( 'order', 'desc' );
+        $request->set_param( 'limit', 100 );
+        $response = rest_do_request( $request );
+
+        if ( $response->is_error() ) {
+            wp_send_json_error( null, 500 );
+        }
+
+        wp_send_json_success( $response->get_data() );
     }
 }
 
 TIMU_ELC::instance();
-
-/**
- * GitHub release-updater integration.
- *
- * Wires the bundled hardened updater (guarded after_install, timeout +
- * User-Agent on the API request, HTTP 200 check, and a 6-hour transient
- * cache). The updater body is a per-plugin duplicated copy namespaced under
- * ThisIsMyURL\ELC so two co-installed plugins can't collide on the class name.
- */
-add_action( 'plugins_loaded', function () {
-    $updater_path = plugin_dir_path( __FILE__ ) . 'github-updater.php';
-    if ( ! file_exists( $updater_path ) ) {
-        return;
-    }
-    require_once $updater_path;
-    if ( class_exists( '\\ThisIsMyURL\\ELC\\GitHubReleaseUpdater' ) ) {
-        \ThisIsMyURL\ELC\GitHubReleaseUpdater::boot( array(
-            'plugin_file' => __FILE__,
-            'slug'        => 'thisismyurl-external-link-control',
-            'repo'        => 'thisismyurl/thisismyurl-external-link-control',
-        ) );
-    }
-} );
