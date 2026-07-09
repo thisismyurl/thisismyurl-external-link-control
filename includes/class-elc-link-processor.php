@@ -316,7 +316,10 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 
 					if ( '_blank' === $target ) {
 						$rel_to_add[] = 'noopener';
-						$rel_to_add[] = 'noreferrer';
+						// noreferrer is user-togglable; missing key = ON for existing installs.
+						if ( ! isset( $options['noreferrer'] ) || ! empty( $options['noreferrer'] ) ) {
+							$rel_to_add[] = 'noreferrer';
+						}
 					}
 
 					$apply_nofollow = ! empty( $options['nofollow'] );
@@ -415,10 +418,12 @@ if ( ! class_exists( 'TIMU_ELC_Link_Processor' ) ) {
 			$rel_to_add = array();
 
 			if ( $tag_target_blank ) {
-				// Reverse-tabnabbing protection. Always applied on any _blank,
-				// regardless of the nofollow setting.
+				// noopener always applied on _blank (reverse-tabnabbing).
+				// noreferrer is user-togglable; missing key = ON for existing installs.
 				$rel_to_add[] = 'noopener';
-				$rel_to_add[] = 'noreferrer';
+				if ( ! isset( $options['noreferrer'] ) || ! empty( $options['noreferrer'] ) ) {
+					$rel_to_add[] = 'noreferrer';
+				}
 			}
 
 			$apply_nofollow = ! empty( $options['nofollow'] );
