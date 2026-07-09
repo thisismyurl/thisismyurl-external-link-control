@@ -106,3 +106,69 @@
 	color: #646970;
 }
 
+/* Domain rules — remove button + removed-row state (since 1.6190). */
+.timu-elc-remove-row {
+	color: #b32d2e;
+}
+
+.timu-elc-remove-row:hover {
+	color: #8c1f1f;
+	text-decoration: underline;
+}
+
+.timu-elc-row-removed {
+	opacity: 0.35;
+	pointer-events: none;
+}
+
+/* Add-row button container. */
+.timu-elc-domain-rules-meta {
+	margin-top: 0.5em;
+}
+
+/* Link inventory table (since 1.6190). */
+.timu-elc-inventory-table {
+	margin-top: 0.5em;
+	width: 100%;
+}
+
+.timu-elc-inventory-table code {
+	background: transparent;
+	padding: 0;
+	word-break: break-all;
+}
+
+.timu-elc-inv-has-rule {
+	color: #007017;
+	font-weight: 600;
+}
+
+.timu-elc-inv-no-rule {
+	color: #646970;
+}
+
+.timu-elc-inv-summary {
+	color: #646970;
+	font-style: italic;
+	padding-top: 0.5em;
+}
+
+.timu-elc-inventory-status {
+	margin-left: 0.6em;
+	color: #646970;
+	font-style: italic;
+	vertical-align: middle;
+}
+
+/* Broken-link status in sidebar (since 1.6190). */
+.timu-elc-status-broken {
+	color: #b32d2e;
+	font-weight: 500;
+	margin: 0 0 0.4em;
+}
+
+.timu-elc-status-ok {
+	color: #007017;
+	font-weight: 500;
+	margin: 0 0 0.4em;
+}
