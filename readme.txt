@@ -3,7 +3,7 @@ Contributors: thisismyurl
 Donate link: https://github.com/sponsors/thisismyurl
 Tags: external links, nofollow, target blank, seo, link management
 Requires at least: 6.2
-Tested up to: 6.7
+Tested up to: 7.1
 Requires PHP: 7.4
 Stable tag: 1.6190.1000
 License: GPLv2 or later
